@@ -8,6 +8,8 @@ export const sampleSession: SampleSession = {
     preparedBy: 'MacroByte Bookkeeping',
   },
   journalVoucherReady: false,
+  journalVoucherFinalised: false,
+  finalisedJournalLinesSnapshot: [],
   documents: [
     {
       id: '01',

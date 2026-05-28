@@ -218,6 +218,9 @@ export interface ChecklistItem {
 export interface SampleSession {
   client: SessionClient
   journalVoucherReady: boolean
+  journalVoucherFinalised: boolean
+  journalVoucherFinalisedAt?: string
+  finalisedJournalLinesSnapshot: JournalLine[]
   documents: SourceDocument[]
   splitDecisions: SplitDecision[]
   reclassifyDecisions: ReclassifyDecision[]

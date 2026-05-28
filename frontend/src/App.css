@@ -1335,6 +1335,249 @@
   margin: 4px 0 0;
 }
 
+.jv-control-banner {
+  align-items: center;
+  border-radius: 8px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 16px;
+}
+
+.jv-control-banner.ready {
+  background: var(--teal-light);
+  border: 1px solid #5eead4;
+}
+
+.jv-control-banner.blocked {
+  background: var(--gold-light);
+  border: 1px solid #f59e0b;
+}
+
+.jv-control-banner span {
+  color: var(--teal);
+  font-family: 'IBM Plex Mono', Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.jv-control-banner.blocked span {
+  color: var(--gold);
+}
+
+.jv-control-banner h2 {
+  color: #1f2d3d;
+  font-size: 20px;
+  margin: 3px 0;
+}
+
+.jv-control-banner p {
+  color: var(--ink-mid);
+  font-size: 13px;
+  margin: 0;
+}
+
+.jv-warning {
+  color: var(--red) !important;
+  font-weight: 700;
+  margin-top: 6px !important;
+}
+
+.jv-summary-grid {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+
+.jv-header-card {
+  background: #f8f9fb;
+  border: 1px solid #dde4ec;
+  border-radius: 6px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 12px;
+  padding: 12px;
+}
+
+.jv-header-card div,
+.jv-total-panel div,
+.jv-signoff div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.jv-header-card span,
+.jv-total-panel span,
+.jv-signoff span {
+  color: var(--ink-light);
+  font-family: 'IBM Plex Mono', Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.jv-header-card strong,
+.jv-total-panel strong {
+  color: #1f2d3d;
+  font-size: 13px;
+}
+
+.jv-readiness-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+.jv-readiness {
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.jv-readiness.pass {
+  background: var(--green-light);
+  border: 1px solid #86efac;
+}
+
+.jv-readiness.fail {
+  background: var(--red-light);
+  border: 1px solid #fca5a5;
+}
+
+.jv-readiness span {
+  font-family: 'IBM Plex Mono', Consolas, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.jv-readiness.pass span,
+.jv-readiness.pass strong {
+  color: var(--green);
+}
+
+.jv-readiness.fail span,
+.jv-readiness.fail strong {
+  color: var(--red);
+}
+
+.jv-readiness strong {
+  display: block;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.jv-table {
+  min-width: 1260px;
+}
+
+.source-bankplus {
+  background: var(--teal-light);
+  color: var(--teal);
+}
+
+.source-split {
+  background: var(--orange-light);
+  color: var(--orange);
+}
+
+.source-reclassify {
+  background: var(--purple-light);
+  color: var(--purple);
+}
+
+.source-adjusting {
+  background: var(--green-light);
+  color: var(--green);
+}
+
+.jv-subtotal-row td {
+  background: #f8f9fb;
+  border-top: 2px solid #dde4ec;
+  color: #1f2d3d;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.jv-total-panel {
+  background: #f8f9fb;
+  border: 1px solid #dde4ec;
+  border-radius: 6px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 12px;
+  padding: 12px;
+}
+
+.jv-total-panel .ok strong {
+  color: var(--green);
+}
+
+.jv-total-panel .alert strong {
+  color: var(--red);
+}
+
+.jv-signoff {
+  border-top: 1px solid #dde4ec;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 18px;
+  padding-top: 14px;
+}
+
+.jv-signoff strong {
+  border-bottom: 1px solid #1f2d3d;
+  color: #1f2d3d;
+  font-size: 13px;
+  min-height: 28px;
+}
+
+.jv-signoff-notes {
+  grid-column: 1 / -1;
+}
+
+@media print {
+  .sidebar,
+  .topbar,
+  .view-heading,
+  .jv-control-banner,
+  .paper-footer,
+  .review-actions {
+    display: none !important;
+  }
+
+  .app-shell {
+    display: block;
+  }
+
+  .content-area {
+    max-width: none;
+    padding: 0;
+  }
+
+  .workpaper {
+    border: 0;
+    box-shadow: none;
+  }
+
+  .paper-head {
+    background: #1f2d3d !important;
+    print-color-adjust: exact;
+  }
+
+  .data-table th {
+    background: #2e4057 !important;
+    color: #c8d8e4 !important;
+    print-color-adjust: exact;
+  }
+}
+
 .entry-list,
 .checklist-list {
   display: flex;
@@ -1505,12 +1748,18 @@
   .accrual-grid,
   .accrual-form-card,
   .validation-check-grid,
+  .jv-summary-grid,
+  .jv-header-card,
+  .jv-readiness-grid,
+  .jv-total-panel,
+  .jv-signoff,
   .adjusting-card,
   .checklist-row {
     grid-template-columns: 1fr;
   }
 
-  .review-banner {
+  .review-banner,
+  .jv-control-banner {
     align-items: flex-start;
     flex-direction: column;
   }
