@@ -3,8 +3,9 @@ import type { ComponentType } from 'react'
 import './App.css'
 import { AppShell } from './components/layout/AppShell'
 import { workflowSteps } from './components/layout/workflow'
-import { DocumentCollection, ExcelDownload } from './components/steps/StepViews'
+import { DocumentCollection } from './components/steps/StepViews'
 import { AdjustingEntries } from './components/steps/AdjustingEntries'
+import { ExcelDownload } from './components/steps/ExcelDownload'
 import { HandoverNote } from './components/steps/HandoverNote'
 import { JournalVoucher } from './components/steps/JournalVoucher'
 import { ReviewValidation } from './components/steps/ReviewValidation'
@@ -15,12 +16,11 @@ import type { SampleSession, WorkflowStepId } from './types/session'
 
 type ReadOnlyStepId = Exclude<
   WorkflowStepId,
-  'wp1' | 'wp2' | 'adjusting' | 'review' | 'journal' | 'handover'
+  'wp1' | 'wp2' | 'adjusting' | 'review' | 'journal' | 'handover' | 'download'
 >
 
 const stepComponents: Record<ReadOnlyStepId, ComponentType<{ session: SampleSession }>> = {
   collection: DocumentCollection,
-  download: ExcelDownload,
 }
 
 function App() {
@@ -36,7 +36,8 @@ function App() {
     activeStep === 'adjusting' ||
     activeStep === 'review' ||
     activeStep === 'journal' ||
-    activeStep === 'handover'
+    activeStep === 'handover' ||
+    activeStep === 'download'
       ? null
       : stepComponents[activeStep]
 
@@ -69,6 +70,8 @@ function App() {
         />
       ) : activeStep === 'handover' ? (
         <HandoverNote onSessionChange={setSession} session={session} />
+      ) : activeStep === 'download' ? (
+        <ExcelDownload session={session} />
       ) : ActiveStep ? (
         <ActiveStep session={session} />
       ) : null}
