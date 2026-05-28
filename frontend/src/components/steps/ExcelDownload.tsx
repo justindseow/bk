@@ -206,7 +206,7 @@ export function ExcelDownload({ session }: ExcelDownloadProps) {
 
       <WorkpaperFrame
         period={session.client.period}
-        subtitle="The backend receives this browser session JSON, generates the workbook, and returns it immediately."
+        subtitle="The workbook is prepared from the current session and returned immediately."
         title="Excel Download"
         footer={
           <>
@@ -215,7 +215,7 @@ export function ExcelDownload({ session }: ExcelDownloadProps) {
               <strong>{filename}</strong>
             </div>
             <div className="metric">
-              <span>Server Storage</span>
+              <span>Saved on Server</span>
               <strong>None</strong>
             </div>
             <button className="primary-button" disabled={exporting} onClick={downloadWorkbook} type="button">

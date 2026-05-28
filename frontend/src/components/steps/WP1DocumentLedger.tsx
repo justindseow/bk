@@ -190,7 +190,7 @@ export function WP1DocumentLedger({ session, onSessionChange }: WP1DocumentLedge
         footer={
           <>
             <div className="metric">
-              <span>Draft JV Lines</span>
+              <span>Posting Lines</span>
               <strong>{draftJournalLines.length}</strong>
             </div>
             <div className="metric">

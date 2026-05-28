@@ -10,7 +10,6 @@ interface ReviewValidationProps {
   onSessionChange: Dispatch<SetStateAction<SampleSession>>
   onStepChange: (step: WorkflowStepId) => void
 }
-
 const formatMoney = (amount: number) =>
   new Intl.NumberFormat('en-MY', {
     minimumFractionDigits: 2,
@@ -99,9 +98,9 @@ export function ReviewValidation({ session, onSessionChange, onStepChange }: Rev
               <strong>{validation.journalLines.length}</strong>
             </div>
             <div className="metric">
-              <span>JV Status</span>
+              <span>Ready for JV</span>
               <strong className={session.journalVoucherReady ? 'metric-ok' : 'metric-alert'}>
-                {session.journalVoucherReady ? 'Finalised' : 'Not Finalised'}
+                {session.journalVoucherReady ? 'Ready' : 'Not Ready'}
               </strong>
             </div>
           </>
@@ -122,7 +121,7 @@ export function ReviewValidation({ session, onSessionChange, onStepChange }: Rev
       </WorkpaperFrame>
 
       <WorkpaperFrame
-        period={`${criticalIssues.length} critical · ${warningIssues.length} warnings`}
+        period={`${criticalIssues.length} critical / ${warningIssues.length} warnings`}
         subtitle="Items to clear or carry forward before the Journal Voucher."
         title="Issues"
       >
@@ -200,3 +199,4 @@ function IssuesTable({
     </div>
   )
 }
+

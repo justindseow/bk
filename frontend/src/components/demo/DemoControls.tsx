@@ -140,7 +140,7 @@ export function DemoControls({ activeStep, onSessionChange, onStepChange }: Demo
       <div className="demo-controls-head">
         <div>
           <span>Demo / QA Controls</span>
-          <strong>Guided workflow testing</strong>
+          <strong>Testing presets only</strong>
         </div>
         <div className="demo-head-actions">
           <button className="secondary-button" onClick={() => setExpanded((value) => !value)} type="button">

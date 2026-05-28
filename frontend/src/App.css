@@ -167,6 +167,43 @@
   margin: 0;
 }
 
+.page-guidance,
+.session-warning {
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+}
+
+.page-guidance {
+  background: #f8f9fb;
+  border: 1px solid #dde4ec;
+}
+
+.session-warning {
+  background: var(--gold-light);
+  border: 1px solid #f59e0b;
+}
+
+.page-guidance strong,
+.session-warning strong {
+  color: #1f2d3d;
+  font-size: 13px;
+}
+
+.page-guidance span,
+.session-warning span {
+  color: var(--ink-mid);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.session-warning strong {
+  color: var(--gold);
+}
+
 .demo-controls {
   background: var(--white);
   border: 1px solid #dde4ec;

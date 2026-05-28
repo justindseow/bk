@@ -80,7 +80,15 @@ POST http://127.0.0.1:8000/export/excel
 4. Review any readiness warnings.
 5. Click `Download Excel Workbook`.
 
-The frontend sends the current browser session JSON to the backend. The backend generates the `.xlsx` file in memory and returns it immediately. No client data is stored server-side.
+The frontend sends the current browser session data to the backend. The backend generates the `.xlsx` file in memory and returns it immediately. No client data is stored server-side.
+
+Backend Excel smoke test:
+
+```text
+GET http://127.0.0.1:8000/export/test-excel
+```
+
+This should download a small workbook that opens in Excel.
 
 ## Guided QA
 
@@ -111,6 +119,14 @@ Demo resets:
 - Port already in use: Vite may move from 5173 to 5174 automatically. For the backend, choose another port and update the frontend export URL if needed.
 - PowerShell npm policy issue: use `npm.cmd` instead of `npm`.
 
+## Known Limitations
+
+- AR/AP workflows are intentionally not included yet.
+- OCR and document extraction are intentionally not included.
+- There is no database and no server-side client data persistence.
+- The current app is designed for one browser session, one client, and one monthly period at a time.
+- Excel export requires the FastAPI backend to be running.
+
 ## Persistence Rule
 
-The browser session JSON is the working state. The backend receives JSON only to generate exports and must not store client data server-side.
+The browser session is the working state. The backend receives the current session only to generate exports and must not store client data server-side.
