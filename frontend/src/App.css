@@ -1174,6 +1174,167 @@
   margin-top: 6px;
 }
 
+.review-banner {
+  align-items: center;
+  border-radius: 8px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 16px;
+}
+
+.review-banner.ready {
+  background: var(--green-light);
+  border: 1px solid #86efac;
+}
+
+.review-banner.blocked {
+  background: var(--red-light);
+  border: 1px solid #fca5a5;
+}
+
+.review-banner span {
+  font-family: 'IBM Plex Mono', Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.review-banner.ready span,
+.review-banner.ready h2 {
+  color: var(--green);
+}
+
+.review-banner.blocked span,
+.review-banner.blocked h2 {
+  color: var(--red);
+}
+
+.review-banner h2 {
+  font-size: 20px;
+  margin: 3px 0;
+}
+
+.review-banner p {
+  color: #1f2d3d;
+  font-size: 13px;
+  margin: 0;
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.review-actions .primary-button,
+.review-actions .secondary-button {
+  margin-left: 0;
+  white-space: nowrap;
+}
+
+.validation-check-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.validation-check-card {
+  align-items: flex-start;
+  border: 1px solid #dde4ec;
+  border-radius: 6px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto 1fr;
+  padding: 12px;
+}
+
+.validation-check-card.pass {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.validation-check-card.warning {
+  background: #fffbeb;
+  border-color: #f59e0b;
+}
+
+.validation-check-card.critical {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.validation-check-card h3 {
+  color: #1f2d3d;
+  font-size: 13px;
+  margin: 0 0 3px;
+}
+
+.validation-check-card p {
+  color: var(--ink-mid);
+  font-size: 12px;
+  margin: 0;
+}
+
+.validation-check-card small {
+  color: var(--ink-light);
+  display: block;
+  font-family: 'IBM Plex Mono', Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  margin-top: 5px;
+  text-transform: uppercase;
+}
+
+.validation-pass {
+  background: var(--green-light);
+  color: var(--green);
+}
+
+.validation-warning {
+  background: var(--gold-light);
+  color: var(--gold);
+}
+
+.validation-critical {
+  background: var(--red-light);
+  color: var(--red);
+}
+
+.review-issues-table {
+  min-width: 920px;
+}
+
+.review-issue-row.critical {
+  background: #fff5f5;
+  border-left: 3px solid var(--red);
+}
+
+.review-issue-row.warning {
+  background: #fffbea;
+  border-left: 3px solid var(--gold);
+}
+
+.review-empty-state {
+  background: var(--green-light);
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  color: var(--green);
+  padding: 14px;
+}
+
+.review-empty-state strong {
+  display: block;
+  font-size: 13px;
+}
+
+.review-empty-state p {
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
 .entry-list,
 .checklist-list {
   display: flex;
@@ -1343,9 +1504,15 @@
   .new-entry-grid,
   .accrual-grid,
   .accrual-form-card,
+  .validation-check-grid,
   .adjusting-card,
   .checklist-row {
     grid-template-columns: 1fr;
+  }
+
+  .review-banner {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .content-area {

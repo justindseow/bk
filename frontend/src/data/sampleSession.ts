@@ -7,6 +7,7 @@ export const sampleSession: SampleSession = {
     bankAccount: 'CIMB Current Account',
     preparedBy: 'MacroByte Bookkeeping',
   },
+  journalVoucherReady: false,
   documents: [
     {
       id: '01',

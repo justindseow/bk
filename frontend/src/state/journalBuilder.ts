@@ -191,3 +191,11 @@ export function generateDraftJournalLinesFromAdjustingEntries(session: SampleSes
     ]
   })
 }
+
+export function generateJournalLines(session: SampleSession): JournalLine[] {
+  return [
+    ...generateDraftJournalLinesFromWP1(session),
+    ...generateDraftJournalLinesFromBankEntries(session),
+    ...generateDraftJournalLinesFromAdjustingEntries(session),
+  ]
+}
