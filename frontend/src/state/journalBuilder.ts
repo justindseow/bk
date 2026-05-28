@@ -1,5 +1,5 @@
 import { cashAccount, findAccount } from '../data/accounts'
-import type { JournalLine, SampleSession, SourceDocument } from '../types/session'
+import type { BankOnlyEntry, BankRow, JournalLine, SampleSession, SourceDocument } from '../types/session'
 
 const parseAccount = (accountText: string) => {
   const [code = '', ...nameParts] = accountText.split(' - ')
@@ -119,5 +119,42 @@ export function generateDraftJournalLinesFromWP1(session: SampleSession): Journa
     if (document.status === 'Reclassified') return buildReclassifyLines(session, document)
     if (document.status === 'Posted') return buildPostedLines(document)
     return []
+  })
+}
+
+const buildBankOnlyLines = (bankRow: BankRow, bankEntry: BankOnlyEntry): JournalLine[] => {
+  const entryLine: JournalLine = {
+    id: `${bankRow.id}-bank-plus-entry`,
+    documentId: bankRow.id,
+    date: bankRow.date,
+    description: bankEntry.description,
+    accountCode: bankEntry.accountCode,
+    accountName: bankEntry.accountName,
+    debit: bankRow.direction === 'DR' ? bankRow.amount : 0,
+    credit: bankRow.direction === 'CR' ? bankRow.amount : 0,
+    source: 'Bank+',
+  }
+  const cashLine: JournalLine = {
+    id: `${bankRow.id}-bank-plus-cash`,
+    documentId: bankRow.id,
+    date: bankRow.date,
+    description:
+      bankRow.direction === 'DR'
+        ? `${bankRow.description} - bank payment`
+        : `${bankRow.description} - bank receipt`,
+    accountCode: cashAccount.code,
+    accountName: cashAccount.name,
+    debit: bankRow.direction === 'CR' ? bankRow.amount : 0,
+    credit: bankRow.direction === 'DR' ? bankRow.amount : 0,
+    source: 'Bank+',
+  }
+
+  return bankRow.direction === 'DR' ? [entryLine, cashLine] : [cashLine, entryLine]
+}
+
+export function generateDraftJournalLinesFromBankEntries(session: SampleSession): JournalLine[] {
+  return session.bankOnlyEntries.flatMap((entry) => {
+    const bankRow = session.bankRows.find((row) => row.id === entry.bankRowId)
+    return bankRow ? buildBankOnlyLines(bankRow, entry) : []
   })
 }

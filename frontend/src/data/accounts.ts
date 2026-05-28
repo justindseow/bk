@@ -32,7 +32,9 @@ export const accountOptions: AccountOption[] = [
   { code: '6210', name: 'Utilities Electricity', category: 'Expense', normalBalance: 'DR' },
   { code: '6370', name: 'Bank Charges & Fees', category: 'Expense', normalBalance: 'DR' },
   { code: '6380', name: 'Insurance Expense', category: 'Expense', normalBalance: 'DR' },
+  { code: '6390', name: 'Tax Payments', category: 'Expense', normalBalance: 'DR' },
   { code: '6600', name: 'Interest Expense', category: 'Expense', normalBalance: 'DR' },
+  { code: '7100', name: 'Interest Income', category: 'Other Income', normalBalance: 'CR' },
   { code: '6700', name: 'Depreciation Expense', category: 'Expense', normalBalance: 'DR' },
 ]
 

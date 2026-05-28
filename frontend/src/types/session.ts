@@ -34,7 +34,14 @@ export type ReclassifyType = 'Asset purchase' | 'Director transaction'
 
 export type EntryDirection = 'DR' | 'CR'
 
-export type BankStatus = 'Matched' | 'Multi-Doc' | 'Added (Bank+)' | 'Outstanding' | 'Unmatched'
+export type BankStatus =
+  | 'Matched'
+  | 'Match Multiple'
+  | 'New'
+  | 'Outstanding / Timing Item'
+  | 'Needs Review'
+
+export type TimingItemType = 'Outstanding cheque' | 'Deposit in transit'
 
 export type AdjustingReversal = 'Reverse Feb' | 'No reversal'
 
@@ -108,18 +115,44 @@ export interface JournalLine {
   accountName: string
   debit: number
   credit: number
-  source: 'Doc' | 'Split' | 'Reclassify'
+  source: 'Doc' | 'Split' | 'Reclassify' | 'Bank+'
 }
 
 export interface BankRow {
   id: string
   date: string
   description: string
+  reference: string
   amount: number
   direction: 'DR' | 'CR'
   status: BankStatus
-  matchedTo: string
+  suggestedDocumentIds?: string[]
+  matchedTo?: string
   remarks: string
+}
+
+export interface BankMatch {
+  bankRowId: string
+  documentIds: string[]
+  matchType: 'Auto' | 'Manual' | 'Multiple'
+  confirmedAt: string
+}
+
+export interface BankOnlyEntry {
+  bankRowId: string
+  accountCode: string
+  accountName: string
+  description: string
+  confirmedAt: string
+}
+
+export interface TimingItem {
+  bankRowId: string
+  timingType: TimingItemType
+  amount: number
+  direction: 'DR' | 'CR'
+  note: string
+  confirmedAt: string
 }
 
 export interface AdjustingEntry {
@@ -147,6 +180,9 @@ export interface SampleSession {
   splitDecisions: SplitDecision[]
   reclassifyDecisions: ReclassifyDecision[]
   bankRows: BankRow[]
+  bankMatches: BankMatch[]
+  bankOnlyEntries: BankOnlyEntry[]
+  timingItems: TimingItem[]
   adjustingEntries: AdjustingEntry[]
   checklistItems: ChecklistItem[]
 }

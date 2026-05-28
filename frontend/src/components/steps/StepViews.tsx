@@ -149,7 +149,7 @@ export function WP2BankVerification({ session }: StepProps) {
           </div>
           <div className="metric">
             <span>Bank+</span>
-            <strong>{session.bankRows.filter((row) => row.status === 'Added (Bank+)').length}</strong>
+            <strong>{session.bankOnlyEntries.length}</strong>
           </div>
           <div className="metric">
             <span>Recon</span>

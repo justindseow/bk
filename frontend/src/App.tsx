@@ -10,17 +10,16 @@ import {
   HandoverNote,
   JournalVoucher,
   ReviewValidation,
-  WP2BankVerification,
 } from './components/steps/StepViews'
 import { WP1DocumentLedger } from './components/steps/WP1DocumentLedger'
+import { WP2BankVerification } from './components/steps/WP2BankVerification'
 import { sampleSession } from './data/sampleSession'
 import type { SampleSession, WorkflowStepId } from './types/session'
 
-type ReadOnlyStepId = Exclude<WorkflowStepId, 'wp1'>
+type ReadOnlyStepId = Exclude<WorkflowStepId, 'wp1' | 'wp2'>
 
 const stepComponents: Record<ReadOnlyStepId, ComponentType<{ session: SampleSession }>> = {
   collection: DocumentCollection,
-  wp2: WP2BankVerification,
   adjusting: AdjustingEntries,
   review: ReviewValidation,
   journal: JournalVoucher,
@@ -35,7 +34,7 @@ function App() {
     () => workflowSteps.find((step) => step.id === activeStep) ?? workflowSteps[0],
     [activeStep],
   )
-  const ActiveStep = activeStep === 'wp1' ? null : stepComponents[activeStep]
+  const ActiveStep = activeStep === 'wp1' || activeStep === 'wp2' ? null : stepComponents[activeStep]
 
   return (
     <AppShell activeStep={activeStep} onStepChange={setActiveStep} session={session}>
@@ -48,6 +47,8 @@ function App() {
       </div>
       {activeStep === 'wp1' ? (
         <WP1DocumentLedger onSessionChange={setSession} session={session} />
+      ) : activeStep === 'wp2' ? (
+        <WP2BankVerification onSessionChange={setSession} session={session} />
       ) : ActiveStep ? (
         <ActiveStep session={session} />
       ) : null}
