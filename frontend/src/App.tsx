@@ -4,23 +4,22 @@ import './App.css'
 import { AppShell } from './components/layout/AppShell'
 import { workflowSteps } from './components/layout/workflow'
 import {
-  AdjustingEntries,
   DocumentCollection,
   ExcelDownload,
   HandoverNote,
   JournalVoucher,
   ReviewValidation,
 } from './components/steps/StepViews'
+import { AdjustingEntries } from './components/steps/AdjustingEntries'
 import { WP1DocumentLedger } from './components/steps/WP1DocumentLedger'
 import { WP2BankVerification } from './components/steps/WP2BankVerification'
 import { sampleSession } from './data/sampleSession'
 import type { SampleSession, WorkflowStepId } from './types/session'
 
-type ReadOnlyStepId = Exclude<WorkflowStepId, 'wp1' | 'wp2'>
+type ReadOnlyStepId = Exclude<WorkflowStepId, 'wp1' | 'wp2' | 'adjusting'>
 
 const stepComponents: Record<ReadOnlyStepId, ComponentType<{ session: SampleSession }>> = {
   collection: DocumentCollection,
-  adjusting: AdjustingEntries,
   review: ReviewValidation,
   journal: JournalVoucher,
   handover: HandoverNote,
@@ -34,7 +33,10 @@ function App() {
     () => workflowSteps.find((step) => step.id === activeStep) ?? workflowSteps[0],
     [activeStep],
   )
-  const ActiveStep = activeStep === 'wp1' || activeStep === 'wp2' ? null : stepComponents[activeStep]
+  const ActiveStep =
+    activeStep === 'wp1' || activeStep === 'wp2' || activeStep === 'adjusting'
+      ? null
+      : stepComponents[activeStep]
 
   return (
     <AppShell activeStep={activeStep} onStepChange={setActiveStep} session={session}>
@@ -49,6 +51,8 @@ function App() {
         <WP1DocumentLedger onSessionChange={setSession} session={session} />
       ) : activeStep === 'wp2' ? (
         <WP2BankVerification onSessionChange={setSession} session={session} />
+      ) : activeStep === 'adjusting' ? (
+        <AdjustingEntries onSessionChange={setSession} session={session} />
       ) : ActiveStep ? (
         <ActiveStep session={session} />
       ) : null}

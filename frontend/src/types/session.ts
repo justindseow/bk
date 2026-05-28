@@ -43,7 +43,9 @@ export type BankStatus =
 
 export type TimingItemType = 'Outstanding cheque' | 'Deposit in transit'
 
-export type AdjustingReversal = 'Reverse Feb' | 'No reversal'
+export type AdjustingEntryType = 'Reversal' | 'Accrual' | 'Depreciation'
+
+export type AdjustingStatus = 'Pending Review' | 'Posted' | 'Reversed' | 'Depreciation Posted'
 
 export interface SessionClient {
   entityName: string
@@ -115,7 +117,7 @@ export interface JournalLine {
   accountName: string
   debit: number
   credit: number
-  source: 'Doc' | 'Split' | 'Reclassify' | 'Bank+'
+  source: 'Doc' | 'Split' | 'Reclassify' | 'Bank+' | 'Adjusting'
 }
 
 export interface BankRow {
@@ -158,11 +160,50 @@ export interface TimingItem {
 export interface AdjustingEntry {
   id: string
   date: string
+  type: AdjustingEntryType
   description: string
   debitAccount: string
   creditAccount: string
   amount: number
-  reversal: AdjustingReversal
+  reverseNextMonth: boolean
+  status: AdjustingStatus
+  notes?: string
+  sourceId?: string
+}
+
+export interface PriorAccrual {
+  id: string
+  originalPeriod: string
+  description: string
+  originalAmount: number
+  debitAccount: string
+  creditAccount: string
+  reversalDate: string
+  status: 'Pending' | 'Reversed'
+}
+
+export interface FutureReversalItem {
+  id: string
+  adjustingEntryId: string
+  action: string
+  entryReference: string
+  amount: number
+  duePeriod: string
+  notes: string
+}
+
+export interface DepreciationScheduleItem {
+  id: string
+  documentId: string
+  assetDescription: string
+  assetAccount: string
+  purchaseDate: string
+  cost: number
+  usefulLifeMonths: number
+  monthlyDepreciation: number
+  accumulatedDepreciationAccount: string
+  depreciationExpenseAccount: string
+  status: 'Ready to Post' | 'Depreciation Posted'
 }
 
 export interface ChecklistItem {
@@ -183,6 +224,9 @@ export interface SampleSession {
   bankMatches: BankMatch[]
   bankOnlyEntries: BankOnlyEntry[]
   timingItems: TimingItem[]
+  priorAccruals: PriorAccrual[]
   adjustingEntries: AdjustingEntry[]
+  futureReversalItems: FutureReversalItem[]
+  depreciationSchedule: DepreciationScheduleItem[]
   checklistItems: ChecklistItem[]
 }

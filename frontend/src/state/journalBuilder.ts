@@ -158,3 +158,36 @@ export function generateDraftJournalLinesFromBankEntries(session: SampleSession)
     return bankRow ? buildBankOnlyLines(bankRow, entry) : []
   })
 }
+
+export function generateDraftJournalLinesFromAdjustingEntries(session: SampleSession): JournalLine[] {
+  return session.adjustingEntries.flatMap((entry) => {
+    const debitAccount = parseAccount(entry.debitAccount)
+    const creditAccount = parseAccount(entry.creditAccount)
+    if (!debitAccount.code || !creditAccount.code || entry.amount <= 0) return []
+
+    return [
+      {
+        id: `${entry.id}-adj-dr`,
+        documentId: entry.id,
+        date: entry.date,
+        description: entry.description,
+        accountCode: debitAccount.code,
+        accountName: debitAccount.name,
+        debit: entry.amount,
+        credit: 0,
+        source: 'Adjusting' as const,
+      },
+      {
+        id: `${entry.id}-adj-cr`,
+        documentId: entry.id,
+        date: entry.date,
+        description: entry.description,
+        accountCode: creditAccount.code,
+        accountName: creditAccount.name,
+        debit: 0,
+        credit: entry.amount,
+        source: 'Adjusting' as const,
+      },
+    ]
+  })
+}

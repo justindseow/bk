@@ -230,7 +230,7 @@ export function AdjustingEntries({ session }: StepProps) {
           </div>
           <div className="metric">
             <span>Reversals</span>
-            <strong>{session.adjustingEntries.filter((entry) => entry.reversal !== 'No reversal').length}</strong>
+            <strong>{session.adjustingEntries.filter((entry) => entry.reverseNextMonth).length}</strong>
           </div>
           <button className="primary-button" type="button">
             Add Adjusting Entry
@@ -252,8 +252,8 @@ export function AdjustingEntries({ session }: StepProps) {
               <span>CR {entry.creditAccount}</span>
               <strong>{formatMoney(entry.amount)}</strong>
             </div>
-            <span className={entry.reversal === 'No reversal' ? 'badge badge-posted' : 'badge badge-pending'}>
-              {entry.reversal}
+            <span className={entry.reverseNextMonth ? 'badge badge-pending' : 'badge badge-posted'}>
+              {entry.reverseNextMonth ? 'Reverse next month' : 'No reversal'}
             </span>
           </article>
         ))}

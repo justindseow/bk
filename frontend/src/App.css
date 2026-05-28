@@ -373,6 +373,8 @@
 .flow-in,
 .badge-posted,
 .badge-matched,
+.badge-reversed,
+.badge-depreciation-posted,
 .source-doc {
   background: var(--green-light);
   color: var(--green);
@@ -410,6 +412,16 @@
 .badge-pending-review {
   background: var(--gold-light);
   color: var(--gold);
+}
+
+.badge-ready-to-post {
+  background: var(--teal-light);
+  color: var(--teal);
+}
+
+.source-adjusting {
+  background: var(--teal-light);
+  color: var(--teal);
 }
 
 .wp1-summary-grid {
@@ -475,6 +487,14 @@
 
 .summary-card.tone-blue strong {
   color: var(--blue);
+}
+
+.summary-card.tone-teal {
+  border-color: #5eead4;
+}
+
+.summary-card.tone-teal strong {
+  color: var(--teal);
 }
 
 .summary-card.tone-red {
@@ -1010,6 +1030,150 @@
   text-transform: uppercase;
 }
 
+.adjusting-tabs {
+  background: #f8f9fb;
+  border: 1px solid #dde4ec;
+  border-radius: 6px;
+  display: inline-flex;
+  gap: 0;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.adjusting-tabs button {
+  background: transparent;
+  border: 0;
+  border-right: 1px solid #dde4ec;
+  color: var(--ink-mid);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 8px 13px;
+}
+
+.adjusting-tabs button:last-child {
+  border-right: 0;
+}
+
+.adjusting-tabs button.active {
+  background: var(--teal);
+  color: var(--white);
+}
+
+.adjusting-table {
+  min-width: 980px;
+}
+
+.depreciation-table {
+  min-width: 1280px;
+}
+
+.adjust-action {
+  border-color: #5eead4;
+  color: var(--teal);
+}
+
+.accrual-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+}
+
+.accrual-form-card,
+.preview-card {
+  background: #fbfcfd;
+  border: 1px solid #dde4ec;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.accrual-form-card {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.accrual-form-card label,
+.preview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.accrual-form-card span,
+.reverse-toggle span {
+  color: var(--ink-light);
+  font-family: 'IBM Plex Mono', Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.accrual-form-card input,
+.accrual-form-card select {
+  background: var(--white);
+  border: 1px solid #dde4ec;
+  border-radius: 4px;
+  color: #1f2d3d;
+  font-size: 12px;
+  min-height: 32px;
+  padding: 6px 8px;
+}
+
+.reverse-toggle {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+}
+
+.reverse-toggle button {
+  background: var(--white);
+  border: 1px solid #dde4ec;
+  border-radius: 4px;
+  color: var(--ink-mid);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 10px;
+}
+
+.reverse-toggle button.selected {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: var(--white);
+}
+
+.preview-card h3 {
+  color: #1f2d3d;
+  font-size: 12px;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.preview-line {
+  align-items: center;
+  border-bottom: 1px solid #edf0f3;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 7px 0;
+}
+
+.preview-line span {
+  color: var(--ink-mid);
+  font-size: 12px;
+}
+
+.preview-line strong {
+  color: #1f2d3d;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-card .primary-button {
+  margin-left: 0;
+  margin-top: 6px;
+}
+
 .entry-list,
 .checklist-list {
   display: flex;
@@ -1177,6 +1341,8 @@
   .split-line-editor,
   .reclass-panel,
   .new-entry-grid,
+  .accrual-grid,
+  .accrual-form-card,
   .adjusting-card,
   .checklist-row {
     grid-template-columns: 1fr;
