@@ -70,11 +70,17 @@ export function WP1DocumentLedger({ session }: StepProps) {
         <>
           <div className="metric">
             <span>Posted</span>
-            <strong>{session.documents.filter((doc) => doc.status !== 'Pending').length}</strong>
+            <strong>
+              {
+                session.documents.filter((doc) =>
+                  ['Posted', 'Split Done', 'Reclassified'].includes(doc.status),
+                ).length
+              }
+            </strong>
           </div>
           <div className="metric">
             <span>Splits</span>
-            <strong>{session.documents.filter((doc) => doc.status === 'Split').length}</strong>
+            <strong>{session.documents.filter((doc) => doc.status === 'Split Done').length}</strong>
           </div>
           <div className="metric">
             <span>Reclassify</span>

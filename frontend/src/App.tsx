@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import type { ComponentType } from 'react'
 import './App.css'
 import { AppShell } from './components/layout/AppShell'
 import { workflowSteps } from './components/layout/workflow'
@@ -9,15 +10,16 @@ import {
   HandoverNote,
   JournalVoucher,
   ReviewValidation,
-  WP1DocumentLedger,
   WP2BankVerification,
 } from './components/steps/StepViews'
+import { WP1DocumentLedger } from './components/steps/WP1DocumentLedger'
 import { sampleSession } from './data/sampleSession'
-import type { WorkflowStepId } from './types/session'
+import type { SampleSession, WorkflowStepId } from './types/session'
 
-const stepComponents = {
+type ReadOnlyStepId = Exclude<WorkflowStepId, 'wp1'>
+
+const stepComponents: Record<ReadOnlyStepId, ComponentType<{ session: SampleSession }>> = {
   collection: DocumentCollection,
-  wp1: WP1DocumentLedger,
   wp2: WP2BankVerification,
   adjusting: AdjustingEntries,
   review: ReviewValidation,
@@ -28,14 +30,15 @@ const stepComponents = {
 
 function App() {
   const [activeStep, setActiveStep] = useState<WorkflowStepId>('collection')
+  const [session, setSession] = useState<SampleSession>(sampleSession)
   const activeMeta = useMemo(
     () => workflowSteps.find((step) => step.id === activeStep) ?? workflowSteps[0],
     [activeStep],
   )
-  const ActiveStep = stepComponents[activeStep]
+  const ActiveStep = activeStep === 'wp1' ? null : stepComponents[activeStep]
 
   return (
-    <AppShell activeStep={activeStep} onStepChange={setActiveStep} session={sampleSession}>
+    <AppShell activeStep={activeStep} onStepChange={setActiveStep} session={session}>
       <div className="view-heading">
         <span>{activeMeta.number}</span>
         <div>
@@ -43,7 +46,11 @@ function App() {
           <h2>{activeMeta.title}</h2>
         </div>
       </div>
-      <ActiveStep session={sampleSession} />
+      {activeStep === 'wp1' ? (
+        <WP1DocumentLedger onSessionChange={setSession} session={session} />
+      ) : ActiveStep ? (
+        <ActiveStep session={session} />
+      ) : null}
     </AppShell>
   )
 }
