@@ -108,10 +108,15 @@ export function ExcelDownload({ session }: ExcelDownloadProps) {
       })
 
       if (!response.ok) {
+        await response.text()
         throw new Error('export-failed')
       }
 
       const blob = await response.blob()
+      if (blob.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+        throw new Error('invalid-workbook-response')
+      }
+
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
@@ -136,6 +141,8 @@ export function ExcelDownload({ session }: ExcelDownloadProps) {
       const friendly =
         error instanceof TypeError
           ? 'Excel export service is not running. Please start the backend and try again.'
+          : error instanceof Error && error.message === 'invalid-workbook-response'
+            ? 'Excel export failed. Please restart the backend and try again.'
           : 'Excel export failed. Please check the session data and try again.'
       setHistory((current) => [
         {

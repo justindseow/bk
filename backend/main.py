@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.export_excel import build_excel_workbook, export_filename
+from app.export_excel import build_excel_workbook, build_test_excel_workbook, export_filename
 from app.models import ExportRequest
 
 app = FastAPI(title="MacroByte BK Tool API")
@@ -35,4 +35,14 @@ def export_excel(payload: ExportRequest) -> StreamingResponse:
         workbook,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/export/test-excel")
+def export_test_excel() -> StreamingResponse:
+    workbook = build_test_excel_workbook()
+    return StreamingResponse(
+        workbook,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="MacroByte_BK_XYZ_Co_Sdn_Bhd_Jan_2025.xlsx"'},
     )

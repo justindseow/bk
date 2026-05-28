@@ -47,6 +47,28 @@ def build_excel_workbook(session: dict[str, Any]) -> BytesIO:
     return buffer
 
 
+def build_test_excel_workbook() -> BytesIO:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Test Workbook"
+    sheet["A1"] = "MacroByte BK Tool"
+    sheet["A2"] = "Excel export test"
+    sheet["A3"] = "Status"
+    sheet["B3"] = "OK"
+    sheet["A1"].font = Font(bold=True, color=WHITE, size=14)
+    sheet["A1"].fill = PatternFill("solid", fgColor=NAVY)
+    sheet["A3"].font = Font(bold=True)
+    sheet["A1"].alignment = Alignment(horizontal="center")
+    sheet.merge_cells("A1:B1")
+    sheet.column_dimensions["A"].width = 24
+    sheet.column_dimensions["B"].width = 18
+
+    buffer = BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
 def export_filename(session: dict[str, Any]) -> str:
     client = session.get("client", {})
     entity = safe_filename_part(client.get("entityName", "Client"))
