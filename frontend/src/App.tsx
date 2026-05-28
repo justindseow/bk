@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ComponentType } from 'react'
 import './App.css'
+import { DemoControls } from './components/demo/DemoControls'
 import { AppShell } from './components/layout/AppShell'
 import { workflowSteps } from './components/layout/workflow'
 import { DocumentCollection } from './components/steps/StepViews'
@@ -50,6 +51,11 @@ function App() {
           <h2>{activeMeta.title}</h2>
         </div>
       </div>
+      <DemoControls
+        activeStep={activeStep}
+        onSessionChange={setSession}
+        onStepChange={setActiveStep}
+      />
       {activeStep === 'wp1' ? (
         <WP1DocumentLedger onSessionChange={setSession} session={session} />
       ) : activeStep === 'wp2' ? (

@@ -167,6 +167,168 @@
   margin: 0;
 }
 
+.demo-controls {
+  background: var(--white);
+  border: 1px solid #dde4ec;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(15, 25, 35, 0.06);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.demo-controls-head {
+  align-items: center;
+  background: #f8f9fb;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.demo-controls-head span,
+.guided-current span,
+.download-history-head span {
+  color: var(--ink-light);
+  font-family: 'IBM Plex Mono', Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.demo-controls-head strong {
+  color: #1f2d3d;
+  display: block;
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.demo-head-actions,
+.guided-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.demo-head-actions .primary-button,
+.demo-head-actions .secondary-button,
+.guided-actions .primary-button,
+.guided-actions .secondary-button {
+  margin-left: 0;
+}
+
+.demo-controls-body {
+  border-top: 1px solid #dde4ec;
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px 14px;
+}
+
+.demo-warning {
+  background: var(--gold-light);
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 9px 11px;
+}
+
+.demo-button-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.demo-button-grid .text-button {
+  background: #ffffff;
+  min-height: 34px;
+  text-align: center;
+}
+
+.guided-test-panel {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+}
+
+.guided-current {
+  background: #f0f7ff;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.guided-current h3 {
+  color: #1f2d3d;
+  font-size: 15px;
+  margin: 4px 0;
+}
+
+.guided-current p {
+  color: var(--ink-mid);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0 0 8px;
+}
+
+.guided-current strong {
+  color: var(--blue);
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+
+.guided-checklist {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.guided-check-item {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dde4ec;
+  border-radius: 6px;
+  color: #1f2d3d;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto 1fr;
+  padding: 9px;
+  text-align: left;
+}
+
+.guided-check-item span {
+  background: #eef2f7;
+  border-radius: 4px;
+  color: var(--ink-mid);
+  font-family: 'IBM Plex Mono', Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 5px 6px;
+}
+
+.guided-check-item strong {
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.guided-check-item.active {
+  background: var(--blue-light);
+  border-color: #93c5fd;
+}
+
+.guided-check-item.done {
+  background: var(--green-light);
+  border-color: #86efac;
+}
+
+.guided-check-item.current-screen {
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+
 .workpaper {
   background: var(--white);
   border: 1px solid var(--ink-faint);
@@ -2174,6 +2336,9 @@
 
   .collection-grid,
   .validation-grid,
+  .demo-button-grid,
+  .guided-test-panel,
+  .guided-checklist,
   .recon-panel,
   .wp2-recon-panel,
   .wp1-summary-grid,
