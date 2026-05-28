@@ -3,12 +3,9 @@ import type { ComponentType } from 'react'
 import './App.css'
 import { AppShell } from './components/layout/AppShell'
 import { workflowSteps } from './components/layout/workflow'
-import {
-  DocumentCollection,
-  ExcelDownload,
-  HandoverNote,
-} from './components/steps/StepViews'
+import { DocumentCollection, ExcelDownload } from './components/steps/StepViews'
 import { AdjustingEntries } from './components/steps/AdjustingEntries'
+import { HandoverNote } from './components/steps/HandoverNote'
 import { JournalVoucher } from './components/steps/JournalVoucher'
 import { ReviewValidation } from './components/steps/ReviewValidation'
 import { WP1DocumentLedger } from './components/steps/WP1DocumentLedger'
@@ -16,11 +13,13 @@ import { WP2BankVerification } from './components/steps/WP2BankVerification'
 import { sampleSession } from './data/sampleSession'
 import type { SampleSession, WorkflowStepId } from './types/session'
 
-type ReadOnlyStepId = Exclude<WorkflowStepId, 'wp1' | 'wp2' | 'adjusting' | 'review' | 'journal'>
+type ReadOnlyStepId = Exclude<
+  WorkflowStepId,
+  'wp1' | 'wp2' | 'adjusting' | 'review' | 'journal' | 'handover'
+>
 
 const stepComponents: Record<ReadOnlyStepId, ComponentType<{ session: SampleSession }>> = {
   collection: DocumentCollection,
-  handover: HandoverNote,
   download: ExcelDownload,
 }
 
@@ -36,7 +35,8 @@ function App() {
     activeStep === 'wp2' ||
     activeStep === 'adjusting' ||
     activeStep === 'review' ||
-    activeStep === 'journal'
+    activeStep === 'journal' ||
+    activeStep === 'handover'
       ? null
       : stepComponents[activeStep]
 
@@ -67,6 +67,8 @@ function App() {
           onStepChange={setActiveStep}
           session={session}
         />
+      ) : activeStep === 'handover' ? (
+        <HandoverNote onSessionChange={setSession} session={session} />
       ) : ActiveStep ? (
         <ActiveStep session={session} />
       ) : null}

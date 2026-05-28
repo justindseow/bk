@@ -215,6 +215,32 @@ export interface ChecklistItem {
   note: string
 }
 
+export type HandoverCategory =
+  | 'Must Do First Next Month'
+  | 'Items to Watch in Next Bank Statement'
+  | 'Recurring Monthly Entries'
+  | 'Opening Balance Reference'
+  | 'Schedules to Carry Forward'
+  | 'Manual Notes'
+
+export type HandoverPriority = 'High' | 'Medium' | 'Low'
+
+export type HandoverSourceStep = 'WP1' | 'WP2' | 'Adjusting' | 'JV' | 'Manual'
+
+export type HandoverStatus = 'Open' | 'Noted' | 'Not applicable'
+
+export interface HandoverItem {
+  id: string
+  category: HandoverCategory
+  priority: HandoverPriority
+  description: string
+  sourceStep: HandoverSourceStep
+  amount?: number
+  dueTiming: string
+  status: HandoverStatus
+  generated: boolean
+}
+
 export interface SampleSession {
   client: SessionClient
   journalVoucherReady: boolean
@@ -233,4 +259,6 @@ export interface SampleSession {
   futureReversalItems: FutureReversalItem[]
   depreciationSchedule: DepreciationScheduleItem[]
   checklistItems: ChecklistItem[]
+  handoverItems: HandoverItem[]
+  manualHandoverItems: HandoverItem[]
 }

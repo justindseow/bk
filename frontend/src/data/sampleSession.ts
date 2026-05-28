@@ -398,4 +398,6 @@ export const sampleSession: SampleSession = {
       note: 'Expected to clear in February bank statement.',
     },
   ],
+  handoverItems: [],
+  manualHandoverItems: [],
 }

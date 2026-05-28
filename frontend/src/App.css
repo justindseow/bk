@@ -419,6 +419,16 @@
   color: var(--teal);
 }
 
+.badge-noted {
+  background: var(--green-light);
+  color: var(--green);
+}
+
+.badge-not-applicable {
+  background: #f3f4f6;
+  color: var(--ink-mid);
+}
+
 .source-adjusting {
   background: var(--teal-light);
   color: var(--teal);
@@ -1542,11 +1552,253 @@
   grid-column: 1 / -1;
 }
 
+.handover-warning-stack {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.handover-warning {
+  background: var(--gold-light);
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+}
+
+.handover-warning.critical {
+  background: var(--red-light);
+  border-color: #fca5a5;
+}
+
+.handover-warning strong {
+  color: var(--gold);
+  font-size: 13px;
+}
+
+.handover-warning.critical strong {
+  color: var(--red);
+}
+
+.handover-warning span {
+  color: #1f2d3d;
+  font-size: 12px;
+}
+
+.handover-summary-grid {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.handover-opening-card {
+  background: #f8f9fb;
+  border: 1px solid #dde4ec;
+  border-radius: 6px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 14px;
+  padding: 12px;
+}
+
+.handover-opening-card div,
+.handover-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.handover-opening-card span,
+.handover-card label span {
+  color: var(--ink-light);
+  font-family: 'IBM Plex Mono', Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.handover-opening-card strong {
+  color: #1f2d3d;
+  font-size: 13px;
+}
+
+.handover-layout {
+  align-items: start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 330px;
+}
+
+.handover-checklist,
+.handover-side-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.handover-section,
+.handover-card {
+  background: #ffffff;
+  border: 1px solid #dde4ec;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.handover-section-head,
+.handover-card-head {
+  align-items: center;
+  background: #f8f9fb;
+  border-bottom: 1px solid #dde4ec;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.handover-section-head h3,
+.handover-card-head h3 {
+  color: #1f2d3d;
+  font-size: 12px;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.handover-section-head span {
+  background: #eef2f7;
+  border-radius: 999px;
+  color: var(--ink-mid);
+  font-family: 'IBM Plex Mono', Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  min-width: 26px;
+  padding: 4px 7px;
+  text-align: center;
+}
+
+.handover-table {
+  min-width: 900px;
+}
+
+.handover-table td strong {
+  color: #1f2d3d;
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.handover-priority,
+.handover-source {
+  border-radius: 8px;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+
+.handover-priority.high {
+  background: var(--red-light);
+  color: var(--red);
+}
+
+.handover-priority.medium {
+  background: var(--gold-light);
+  color: var(--gold);
+}
+
+.handover-priority.low {
+  background: var(--green-light);
+  color: var(--green);
+}
+
+.handover-source-wp1 {
+  background: var(--blue-light);
+  color: var(--blue);
+}
+
+.handover-source-wp2 {
+  background: var(--purple-light);
+  color: var(--purple);
+}
+
+.handover-source-adjusting {
+  background: var(--teal-light);
+  color: var(--teal);
+}
+
+.handover-source-jv {
+  background: #eef2f7;
+  color: #1f2d3d;
+}
+
+.handover-source-manual {
+  background: var(--gold-light);
+  color: var(--gold);
+}
+
+.handover-actions {
+  min-width: 250px;
+}
+
+.handover-empty {
+  color: var(--ink-light);
+  font-size: 12px;
+  padding: 12px;
+}
+
+.manual-note-card {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 12px;
+}
+
+.manual-note-card label,
+.manual-note-card button {
+  margin-left: 12px;
+  margin-right: 12px;
+}
+
+.manual-note-card input,
+.manual-note-card select,
+.manual-note-card textarea {
+  background: var(--white);
+  border: 1px solid #dde4ec;
+  border-radius: 4px;
+  color: #1f2d3d;
+  font-size: 12px;
+  min-height: 32px;
+  padding: 6px 8px;
+  resize: vertical;
+}
+
+.manual-note-card .primary-button {
+  margin-left: 12px;
+}
+
+.handover-preview {
+  background: #fbfcfd;
+}
+
+.handover-preview pre {
+  color: #1f2d3d;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 0;
+  max-height: 520px;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+}
+
 @media print {
   .sidebar,
   .topbar,
   .view-heading,
   .jv-control-banner,
+  .handover-warning-stack,
   .paper-footer,
   .review-actions {
     display: none !important;
@@ -1753,6 +2005,9 @@
   .jv-readiness-grid,
   .jv-total-panel,
   .jv-signoff,
+  .handover-summary-grid,
+  .handover-opening-card,
+  .handover-layout,
   .adjusting-card,
   .checklist-row {
     grid-template-columns: 1fr;
