@@ -35,9 +35,19 @@ const stepLabel = (step: WorkflowStepId) => {
 
 export function ReviewValidation({ session, onSessionChange, onStepChange }: ReviewValidationProps) {
   const [runCount, setRunCount] = useState(1)
+  const [lastRunAt, setLastRunAt] = useState('Checked automatically when this page opened.')
   const validation = useMemo(() => buildValidationResults(session), [session, runCount])
   const criticalIssues = validation.issues.filter((issue) => issue.severity === 'Critical')
   const warningIssues = validation.issues.filter((issue) => issue.severity === 'Warning')
+
+  const runValidation = () => {
+    setRunCount((count) => count + 1)
+    setLastRunAt(`Last checked at ${new Date().toLocaleTimeString('en-MY', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })}.`)
+  }
 
   const finalise = () => {
     if (!validation.ready) return
@@ -57,11 +67,11 @@ export function ReviewValidation({ session, onSessionChange, onStepChange }: Rev
           </p>
         </div>
         <div className="review-actions">
-          <button className="secondary-button" onClick={() => setRunCount((count) => count + 1)} type="button">
+          <button className="primary-button" onClick={runValidation} type="button">
             Run Validation
           </button>
           <button
-            className="primary-button"
+            className="secondary-button"
             disabled={!validation.ready}
             onClick={finalise}
             title={validation.ready ? 'Finalise for Journal Voucher' : 'Critical issues must be resolved first.'}
@@ -69,6 +79,8 @@ export function ReviewValidation({ session, onSessionChange, onStepChange }: Rev
           >
             Finalise for Journal Voucher
           </button>
+          <small>{lastRunAt}</small>
+          {!validation.ready ? <small>Finalise is available after critical issues are cleared.</small> : null}
         </div>
       </section>
 
