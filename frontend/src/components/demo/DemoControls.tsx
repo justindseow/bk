@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import {
+  createBlankBkTestSession,
   createCleanDemoSession,
   createSessionWithIssues,
   finaliseDemoJournalVoucher,
@@ -10,6 +11,7 @@ import {
   makeWp2Ready,
 } from '../../state/demoSessions'
 import type { SampleSession, WorkflowStepId } from '../../types/session'
+import { downloadCsv } from '../../utils/downloadCsv'
 
 interface DemoControlsProps {
   activeStep: WorkflowStepId
@@ -94,7 +96,7 @@ const guidedSteps: GuidedStep[] = [
 ]
 
 export function DemoControls({ activeStep, onSessionChange, onStepChange }: DemoControlsProps) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(true)
   const [guidedActive, setGuidedActive] = useState(false)
   const [guidedIndex, setGuidedIndex] = useState(0)
   const currentStep = guidedSteps[guidedIndex]
@@ -129,6 +131,15 @@ export function DemoControls({ activeStep, onSessionChange, onStepChange }: Demo
     setGuidedIndex(0)
   }
 
+  const clearCurrentSession = () => {
+    if (!window.confirm('Clear the current session data? Demo presets will still be available.')) return
+    onSessionChange((current) => createBlankBkTestSession(current))
+    onStepChange('wp1')
+    setExpanded(true)
+    setGuidedActive(false)
+    setGuidedIndex(0)
+  }
+
   const nextGuidedStep = () => {
     const nextIndex = Math.min(guidedIndex + 1, guidedSteps.length - 1)
     setGuidedIndex(nextIndex)
@@ -140,7 +151,7 @@ export function DemoControls({ activeStep, onSessionChange, onStepChange }: Demo
       <div className="demo-controls-head">
         <div>
           <span>Demo / QA Controls</span>
-          <strong>Testing presets only</strong>
+          <strong>Safe testing tools</strong>
         </div>
         <div className="demo-head-actions">
           <button className="secondary-button" onClick={() => setExpanded((value) => !value)} type="button">
@@ -154,7 +165,67 @@ export function DemoControls({ activeStep, onSessionChange, onStepChange }: Demo
 
       {expanded ? (
         <div className="demo-controls-body">
+          <div className="qa-start-panel">
+            <div>
+              <span>Start here</span>
+              <h3>Choose how you want to test today</h3>
+              <p>Use the guided path if you are reviewing the tool. Use your own data when you have sanitised sample rows ready.</p>
+            </div>
+            <div className="qa-choice-grid">
+              <button className="qa-choice-card recommended" onClick={startGuidedTest} type="button">
+                <span>Recommended</span>
+                <strong>Guided Demo Test</strong>
+                <small>Walk through each step with expected results.</small>
+              </button>
+              <button className="qa-choice-card" onClick={clearCurrentSession} type="button">
+                <span>BK Test Session</span>
+                <strong>Use Your Own Test Data</strong>
+                <small>Clear the screen, then add or paste sanitised WP1 and WP2 rows.</small>
+              </button>
+              <button className="qa-choice-card" onClick={() => applyPreset(makeFullSessionReadyForJv, 'review')} type="button">
+                <span>Shortcut</span>
+                <strong>Known Good Session</strong>
+                <small>Jump to a clean session ready for Review and JV testing.</small>
+              </button>
+            </div>
+          </div>
           <div className="demo-warning">Demo controls are for testing only and will reset the current session data.</div>
+          <div className="bk-test-panel">
+            <div>
+              <span>BK Test Session</span>
+              <strong>Use your own test data</strong>
+              <p>Use sanitised sample data first. Do not upload confidential client files unless authorised.</p>
+            </div>
+            <div className="bk-test-actions">
+              <button className="secondary-button" onClick={clearCurrentSession} type="button">
+                Clear Current Session Data
+              </button>
+              <button
+                className="secondary-button"
+                onClick={() =>
+                  downloadCsv('MacroByte_WP1_Document_Template.csv', [
+                    ['Date', 'Document Ref', 'Vendor / Customer', 'Document Type', 'Amount', 'GL Account', 'Notes'],
+                    ['03 Jan', 'INV-TEST-001', 'Sample Customer', 'Sales Invoice', '1000', '4100 - Sales Revenue', 'Sanitised test row'],
+                  ])
+                }
+                type="button"
+              >
+                Download WP1 Template
+              </button>
+              <button
+                className="secondary-button"
+                onClick={() =>
+                  downloadCsv('MacroByte_WP2_Bank_Template.csv', [
+                    ['Date', 'Bank Description', 'Reference', 'Money In', 'Money Out', 'Notes'],
+                    ['03 Jan', 'Sample Customer IBG', 'INV-TEST-001', '1000', '', 'Sanitised bank row'],
+                  ])
+                }
+                type="button"
+              >
+                Download WP2 Template
+              </button>
+            </div>
+          </div>
 
           <div className="demo-button-grid">
             <button className="text-button" onClick={resetClean} type="button">

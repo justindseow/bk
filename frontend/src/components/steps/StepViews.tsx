@@ -427,7 +427,7 @@ export function ExcelDownload({ session }: StepProps) {
   return (
     <WorkpaperFrame
       period={session.client.period}
-      subtitle="Download the current session as an Excel workbook. The backend receives JSON only for this export."
+      subtitle="Download the current session as an Excel workbook. Nothing is stored after the export."
       title="Excel Download"
       footer={
         <>
@@ -459,7 +459,7 @@ export function ExcelDownload({ session }: StepProps) {
       </div>
       <div className="info-panel green">
         <strong>No server-side storage</strong>
-        <p>The Excel file is generated from this browser session JSON and returned immediately.</p>
+        <p>The Excel file is generated from the current browser session and returned immediately.</p>
       </div>
     </WorkpaperFrame>
   )

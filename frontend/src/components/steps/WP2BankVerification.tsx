@@ -12,6 +12,7 @@ import type {
   TimingItemType,
 } from '../../types/session'
 import { WorkpaperFrame } from '../layout/WorkpaperFrame'
+import { downloadCsv } from '../../utils/downloadCsv'
 
 interface WP2BankVerificationProps {
   session: SampleSession
@@ -22,7 +23,18 @@ type ModalState =
   | { type: 'match-multiple'; bankRow: BankRow }
   | { type: 'new-entry'; bankRow: BankRow }
   | { type: 'timing-item'; bankRow: BankRow }
+  | { type: 'add-bank-row' }
+  | { type: 'edit-bank-row'; bankRow: BankRow }
   | null
+
+type BankRowFormState = {
+  date: string
+  description: string
+  reference: string
+  moneyIn: number
+  moneyOut: number
+  notes: string
+}
 
 const BANK_CLOSING_BALANCE = 48320
 const BOOK_BALANCE_BEFORE_BANK_ONLY = 42595
@@ -92,8 +104,62 @@ const amountIn = (row: BankRow) => (row.direction === 'CR' ? row.amount : 0)
 
 const amountOut = (row: BankRow) => (row.direction === 'DR' ? row.amount : 0)
 
+const nextBankRowId = (rows: BankRow[]) => {
+  const maxNumber = rows.reduce((max, row) => {
+    const numeric = Number(row.id.replace(/\D/g, ''))
+    return Number.isFinite(numeric) ? Math.max(max, numeric) : max
+  }, 0)
+  return String(maxNumber + 1).padStart(2, '0')
+}
+
+const bankFormFromRow = (row?: BankRow): BankRowFormState => ({
+  date: row?.date ?? '',
+  description: row?.description ?? '',
+  reference: row?.reference ?? '',
+  moneyIn: row?.direction === 'CR' ? row.amount : 0,
+  moneyOut: row?.direction === 'DR' ? row.amount : 0,
+  notes: row?.remarks ?? '',
+})
+
+const parseAmount = (value: string) => Number(value.replace(/[(),RM\s]/gi, '').replace(/,/g, '')) || 0
+
+const bankRowFromForm = (form: BankRowFormState, id: string): BankRow => {
+  const moneyIn = Number(form.moneyIn || 0)
+  const moneyOut = Number(form.moneyOut || 0)
+  const direction = moneyIn > 0 ? 'CR' : 'DR'
+  return {
+    id,
+    date: form.date.trim(),
+    description: form.description.trim(),
+    reference: form.reference.trim(),
+    amount: moneyIn > 0 ? moneyIn : moneyOut,
+    direction,
+    status: 'Needs Review',
+    matchedTo: 'Review against WP1',
+    remarks: form.notes.trim() || 'Manual bank row',
+  }
+}
+
+const parseWp2Paste = (text: string): BankRowFormState[] =>
+  text
+    .split(/\r?\n/)
+    .map((row) => row.trim())
+    .filter(Boolean)
+    .map((row) => row.split('\t').map((cell) => cell.trim()))
+    .filter((cells) => cells[0]?.toLowerCase() !== 'date')
+    .map(([date = '', description = '', reference = '', moneyIn = '', moneyOut = '', notes = '']) => ({
+      date,
+      description,
+      reference,
+      moneyIn: parseAmount(moneyIn),
+      moneyOut: parseAmount(moneyOut),
+      notes,
+    }))
+
 export function WP2BankVerification({ session, onSessionChange }: WP2BankVerificationProps) {
   const [modal, setModal] = useState<ModalState>(null)
+  const [pasteText, setPasteText] = useState('')
+  const [pastePreview, setPastePreview] = useState<BankRowFormState[]>([])
   const bankPlusLines = useMemo(() => generateDraftJournalLinesFromBankEntries(session), [session])
 
   const reconciliation = useMemo(() => {
@@ -161,8 +227,119 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
     }))
   }
 
+  const deleteBankRow = (bankRowId: string) => {
+    if (!window.confirm('Delete this bank row from the current session?')) return
+    onSessionChange((current) => ({
+      ...current,
+      bankRows: current.bankRows.filter((row) => row.id !== bankRowId),
+      bankMatches: current.bankMatches.filter((match) => match.bankRowId !== bankRowId),
+      bankOnlyEntries: current.bankOnlyEntries.filter((entry) => entry.bankRowId !== bankRowId),
+      timingItems: current.timingItems.filter((item) => item.bankRowId !== bankRowId),
+      journalVoucherReady: false,
+    }))
+  }
+
+  const importPreviewRows = () => {
+    onSessionChange((current) => {
+      let counter = 0
+      const rows = pastePreview.map((row) => {
+        counter += 1
+        return bankRowFromForm(row, `B${String(current.bankRows.length + counter).padStart(3, '0')}`)
+      })
+      return {
+        ...current,
+        bankRows: [...current.bankRows, ...rows],
+        journalVoucherReady: false,
+      }
+    })
+    setPastePreview([])
+    setPasteText('')
+  }
+
   return (
     <>
+      <section className="manual-entry-panel">
+        <div className="manual-entry-copy">
+          <span>BK Test Session</span>
+          <strong>Add your WP2 bank statement rows here.</strong>
+          <p>Use Add Bank Row for one line, or paste copied bank statement rows and preview before importing.</p>
+        </div>
+        <div className="manual-entry-actions">
+          <button
+            className="secondary-button"
+            onClick={() =>
+              downloadCsv('MacroByte_WP2_Bank_Template.csv', [
+                ['Date', 'Bank Description', 'Reference', 'Money In', 'Money Out', 'Notes'],
+                ['03 Jan', 'Sample Customer IBG', 'INV-TEST-001', '1000', '', 'Sanitised bank row'],
+              ])
+            }
+            type="button"
+          >
+            Download WP2 Template
+          </button>
+          <button className="secondary-button" onClick={() => setModal({ type: 'add-bank-row' })} type="button">
+            Add Bank Row
+          </button>
+          <button
+            className="secondary-button"
+            disabled={!pasteText.trim()}
+            onClick={() => setPastePreview(parseWp2Paste(pasteText))}
+            type="button"
+          >
+            Preview Paste
+          </button>
+        </div>
+      </section>
+
+      <section className="paste-panel">
+        <label>
+          <span>Paste Bank Statement Rows</span>
+          <small>Expected columns: Date, Bank Description, Reference, Money In, Money Out, Notes.</small>
+          <textarea
+            placeholder="Date&#9;Bank Description&#9;Reference&#9;Money In&#9;Money Out&#9;Notes"
+            rows={4}
+            value={pasteText}
+            onChange={(event) => setPasteText(event.target.value)}
+          />
+        </label>
+        {pastePreview.length ? (
+          <div className="paste-preview">
+            <div className="paste-preview-head">
+              <strong>{pastePreview.length} row(s) ready to import</strong>
+              <button className="primary-button" onClick={importPreviewRows} type="button">
+                Import Preview Rows
+              </button>
+            </div>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Bank Description</th>
+                    <th>Reference</th>
+                    <th className="right">Money In</th>
+                    <th className="right">Money Out</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pastePreview.map((row, index) => (
+                    <tr key={`${row.reference}-${index}`}>
+                      <td>{row.date}</td>
+                      <td>{row.description}</td>
+                      <td className="mono">{row.reference}</td>
+                      <td className="right amount-in">{row.moneyIn ? formatMoney(row.moneyIn) : '-'}</td>
+                      <td className="right amount-out">{row.moneyOut ? `(${formatMoney(row.moneyOut)})` : '-'}</td>
+                      <td>{row.notes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
+      </section>
+
       <div className="wp1-summary-grid">
         <SummaryCard label="Bank Rows" value={summary.rows.toString()} />
         <SummaryCard label="Matched" tone="green" value={summary.matched.toString()} />
@@ -269,6 +446,13 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
                             >
                               Mark Matched
                             </button>
+                            <button
+                              className="text-button split-action"
+                              onClick={() => setModal({ type: 'new-entry', bankRow: row })}
+                              type="button"
+                            >
+                              New Entry
+                            </button>
                             {canTreatAsTiming ? (
                               <button
                                 className="text-button reclass-action"
@@ -283,6 +467,12 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
                         {row.status === 'Matched' || row.status === 'Outstanding / Timing Item' ? (
                           <span className="verified-text">Verified</span>
                         ) : null}
+                        <button className="text-button" onClick={() => setModal({ type: 'edit-bank-row', bankRow: row })} type="button">
+                          Edit
+                        </button>
+                        <button className="text-button" onClick={() => deleteBankRow(row.id)} type="button">
+                          Delete
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -294,6 +484,39 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
 
         <ReconciliationPanel reconciliation={reconciliation} session={session} />
       </WorkpaperFrame>
+
+      {modal?.type === 'add-bank-row' ? (
+        <BankRowModal
+          onClose={() => setModal(null)}
+          onSave={(form) => {
+            onSessionChange((current) => ({
+              ...current,
+              bankRows: [...current.bankRows, bankRowFromForm(form, nextBankRowId(current.bankRows))],
+              journalVoucherReady: false,
+            }))
+            setModal(null)
+          }}
+        />
+      ) : null}
+
+      {modal?.type === 'edit-bank-row' ? (
+        <BankRowModal
+          bankRow={modal.bankRow}
+          onClose={() => setModal(null)}
+          onSave={(form) => {
+            onSessionChange((current) => ({
+              ...current,
+              bankRows: current.bankRows.map((row) =>
+                row.id === modal.bankRow.id
+                  ? { ...bankRowFromForm(form, row.id), status: row.status, matchedTo: row.matchedTo }
+                  : row,
+              ),
+              journalVoucherReady: false,
+            }))
+            setModal(null)
+          }}
+        />
+      ) : null}
 
       {modal?.type === 'match-multiple' ? (
         <MatchMultipleModal
@@ -404,6 +627,89 @@ function SummaryCard({
       <span>{label}</span>
       <strong>{value}</strong>
     </article>
+  )
+}
+
+function BankRowModal({
+  bankRow,
+  onClose,
+  onSave,
+}: {
+  bankRow?: BankRow
+  onClose: () => void
+  onSave: (form: BankRowFormState) => void
+}) {
+  const [form, setForm] = useState<BankRowFormState>(bankFormFromRow(bankRow))
+  const canSave = Boolean(
+    form.date.trim() &&
+      form.description.trim() &&
+      form.reference.trim() &&
+      (Number(form.moneyIn || 0) > 0 || Number(form.moneyOut || 0) > 0) &&
+      !(Number(form.moneyIn || 0) > 0 && Number(form.moneyOut || 0) > 0),
+  )
+
+  return (
+    <ModalFrame
+      eyebrow="Manual WP2 entry"
+      onClose={onClose}
+      title={bankRow ? 'Edit Bank Row' : 'Add Bank Row'}
+    >
+      <div className="manual-form-grid">
+        <label>
+          <span>Date</span>
+          <input value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
+        </label>
+        <label>
+          <span>Bank Description</span>
+          <input
+            value={form.description}
+            onChange={(event) => setForm({ ...form, description: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>Reference</span>
+          <input value={form.reference} onChange={(event) => setForm({ ...form, reference: event.target.value })} />
+        </label>
+        <label>
+          <span>Money In</span>
+          <input
+            min="0"
+            step="0.01"
+            type="number"
+            value={form.moneyIn}
+            onChange={(event) => setForm({ ...form, moneyIn: Number(event.target.value), moneyOut: 0 })}
+          />
+        </label>
+        <label>
+          <span>Money Out</span>
+          <input
+            min="0"
+            step="0.01"
+            type="number"
+            value={form.moneyOut}
+            onChange={(event) => setForm({ ...form, moneyOut: Number(event.target.value), moneyIn: 0 })}
+          />
+        </label>
+        <label className="wide-field">
+          <span>Notes</span>
+          <input value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+        </label>
+      </div>
+
+      <div className={canSave ? 'balance-box ok' : 'balance-box error'}>
+        <span>Bank row check</span>
+        <strong>{canSave ? 'Ready to save' : 'Enter either money in or money out'}</strong>
+      </div>
+
+      <div className="modal-actions">
+        <button className="secondary-button" onClick={onClose} type="button">
+          Cancel
+        </button>
+        <button className="primary-button" disabled={!canSave} onClick={() => onSave(form)} type="button">
+          Save Bank Row
+        </button>
+      </div>
+    </ModalFrame>
   )
 }
 
@@ -539,7 +845,7 @@ function MatchMultipleModal({
             <span>
               <strong>{documentLabel(document)}</strong>
               <small>
-                {document.date} · {document.docType} · RM {formatMoney(document.amount)}
+                {document.date} - {document.docType} - RM {formatMoney(document.amount)}
               </small>
             </span>
           </label>

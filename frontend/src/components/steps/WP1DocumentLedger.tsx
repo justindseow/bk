@@ -5,6 +5,7 @@ import { generateDraftJournalLinesFromWP1 } from '../../state/journalBuilder'
 import type {
   AccountOption,
   DirectorTransactionNature,
+  DocumentType,
   EntryDirection,
   ReclassifyDecision,
   ReclassifyType,
@@ -15,17 +16,31 @@ import type {
   SplitType,
 } from '../../types/session'
 import { WorkpaperFrame } from '../layout/WorkpaperFrame'
+import { downloadCsv } from '../../utils/downloadCsv'
 
 interface WP1DocumentLedgerProps {
   session: SampleSession
   onSessionChange: Dispatch<SetStateAction<SampleSession>>
+  onStepChange: (step: 'wp2') => void
 }
 
 type ModalState =
   | { type: 'split'; document: SourceDocument }
   | { type: 'reclassify'; document: SourceDocument }
   | { type: 'edit-gl'; document: SourceDocument }
+  | { type: 'add-document' }
+  | { type: 'edit-document'; document: SourceDocument }
   | null
+
+type DocumentFormState = {
+  date: string
+  docRef: string
+  party: string
+  docType: DocumentType
+  amount: number
+  glAccount: string
+  note: string
+}
 
 const formatMoney = (amount: number) =>
   new Intl.NumberFormat('en-MY', {
@@ -48,6 +63,17 @@ const statusKey = (status: string) =>
 const splitTypes: SplitType[] = ['Prepayment', 'Payroll', 'Loan repayment', 'Bulk payment']
 
 const reclassifyTypes: ReclassifyType[] = ['Asset purchase', 'Director transaction']
+
+const documentTypes: DocumentType[] = [
+  'Sales Invoice',
+  'Purchase Invoice',
+  'Payment Voucher',
+  'Receipt',
+  'Payroll Summary',
+  'Loan / HP Statement',
+  'Merchant Statement',
+  'Utility Bill',
+]
 
 const directorOptions: Array<{
   nature: DirectorTransactionNature
@@ -131,9 +157,72 @@ const defaultSplitLines = (document: SourceDocument, splitType: SplitType): Spli
   ]
 }
 
-export function WP1DocumentLedger({ session, onSessionChange }: WP1DocumentLedgerProps) {
+const flowForDocumentType = (docType: DocumentType) =>
+  ['Sales Invoice', 'Receipt', 'Merchant Statement'].includes(docType) ? 'IN' : 'OUT'
+
+const nextDocumentId = (documents: SourceDocument[]) => {
+  const maxNumber = documents.reduce((max, document) => {
+    const numeric = Number(document.id.replace(/\D/g, ''))
+    return Number.isFinite(numeric) ? Math.max(max, numeric) : max
+  }, 0)
+  return String(maxNumber + 1).padStart(2, '0')
+}
+
+const formFromDocument = (document?: SourceDocument): DocumentFormState => ({
+  date: document?.date ?? '',
+  docRef: document?.docRef ?? '',
+  party: document?.party ?? '',
+  docType: document?.docType ?? 'Purchase Invoice',
+  amount: document?.amount ?? 0,
+  glAccount: document?.glAccount ?? '',
+  note: document?.note ?? '',
+})
+
+const documentFromForm = (form: DocumentFormState, id: string): SourceDocument => ({
+  id,
+  date: form.date.trim(),
+  docRef: form.docRef.trim(),
+  party: form.party.trim(),
+  docType: form.docType,
+  amount: Number(form.amount || 0),
+  flow: flowForDocumentType(form.docType),
+  glAccount: form.glAccount.trim(),
+  status: form.glAccount.trim() ? 'Posted' : 'Pending Review',
+  note: form.note.trim() || undefined,
+})
+
+const parseAmount = (value: string) => Number(value.replace(/[(),RM\s]/gi, '').replace(/,/g, '')) || 0
+
+const parseWp1Paste = (text: string): DocumentFormState[] =>
+  text
+    .split(/\r?\n/)
+    .map((row) => row.trim())
+    .filter(Boolean)
+    .map((row) => row.split('\t').map((cell) => cell.trim()))
+    .filter((cells) => cells[0]?.toLowerCase() !== 'date')
+    .map(([date = '', docRef = '', party = '', docType = 'Purchase Invoice', amount = '0', glAccount = '', note = '']) => ({
+      date,
+      docRef,
+      party,
+      docType: documentTypes.includes(docType as DocumentType) ? (docType as DocumentType) : 'Purchase Invoice',
+      amount: parseAmount(amount),
+      glAccount,
+      note,
+    }))
+
+export function WP1DocumentLedger({ session, onSessionChange, onStepChange }: WP1DocumentLedgerProps) {
   const [modal, setModal] = useState<ModalState>(null)
+  const [pasteText, setPasteText] = useState('')
+  const [pastePreview, setPastePreview] = useState<DocumentFormState[]>([])
   const draftJournalLines = useMemo(() => generateDraftJournalLinesFromWP1(session), [session])
+  const unresolvedWp1Rows = useMemo(
+    () =>
+      session.documents.filter(
+        (document) =>
+          ['Needs Split', 'Reclassify', 'Pending Review'].includes(document.status) || !document.glAccount,
+      ),
+    [session.documents],
+  )
 
   const summary = useMemo(() => {
     const posted = session.documents.filter((document) =>
@@ -172,8 +261,129 @@ export function WP1DocumentLedger({ session, onSessionChange }: WP1DocumentLedge
     }))
   }
 
+  const deleteDocument = (documentId: string) => {
+    if (!window.confirm('Delete this document row from the current session?')) return
+    onSessionChange((current) => ({
+      ...current,
+      documents: current.documents.filter((document) => document.id !== documentId),
+      splitDecisions: current.splitDecisions.filter((decision) => decision.documentId !== documentId),
+      reclassifyDecisions: current.reclassifyDecisions.filter((decision) => decision.documentId !== documentId),
+      bankMatches: current.bankMatches
+        .map((match) => ({
+          ...match,
+          documentIds: match.documentIds.filter((id) => id !== documentId),
+        }))
+        .filter((match) => match.documentIds.length),
+      journalVoucherReady: false,
+    }))
+  }
+
+  const importPreviewRows = () => {
+    onSessionChange((current) => {
+      let counter = 0
+      const rows = pastePreview.map((row) => {
+        counter += 1
+        return documentFromForm(row, `M${String(current.documents.length + counter).padStart(3, '0')}`)
+      })
+      return {
+        ...current,
+        documents: [...current.documents, ...rows],
+        journalVoucherReady: false,
+      }
+    })
+    setPastePreview([])
+    setPasteText('')
+  }
+
   return (
     <>
+      <section className="manual-entry-panel">
+        <div className="manual-entry-copy">
+          <span>BK Test Session</span>
+          <strong>Add your WP1 document rows here.</strong>
+          <p>Use Add Document for one row, or paste rows copied from Excel and preview before importing.</p>
+        </div>
+        <div className="manual-entry-actions">
+          <button
+            className="secondary-button"
+            onClick={() =>
+              downloadCsv('MacroByte_WP1_Document_Template.csv', [
+                ['Date', 'Document Ref', 'Vendor / Customer', 'Document Type', 'Amount', 'GL Account', 'Notes'],
+                ['03 Jan', 'INV-TEST-001', 'Sample Customer', 'Sales Invoice', '1000', '4100 - Sales Revenue', 'Sanitised test row'],
+              ])
+            }
+            type="button"
+          >
+            Download WP1 Template
+          </button>
+          <button className="secondary-button" onClick={() => setModal({ type: 'add-document' })} type="button">
+            Add Document
+          </button>
+          <button
+            className="secondary-button"
+            onClick={() => {
+              const rows = parseWp1Paste(pasteText)
+              setPastePreview(rows)
+            }}
+            disabled={!pasteText.trim()}
+            type="button"
+          >
+            Preview Paste
+          </button>
+        </div>
+      </section>
+
+      <section className="paste-panel">
+        <label>
+          <span>Paste from Excel</span>
+          <small>Expected columns: Date, Document Ref, Vendor / Customer, Document Type, Amount, GL Account, Notes.</small>
+          <textarea
+            placeholder="Date&#9;Document Ref&#9;Vendor / Customer&#9;Document Type&#9;Amount&#9;GL Account&#9;Notes"
+            rows={4}
+            value={pasteText}
+            onChange={(event) => setPasteText(event.target.value)}
+          />
+        </label>
+        {pastePreview.length ? (
+          <div className="paste-preview">
+            <div className="paste-preview-head">
+              <strong>{pastePreview.length} row(s) ready to import</strong>
+              <button className="primary-button" onClick={importPreviewRows} type="button">
+                Import Preview Rows
+              </button>
+            </div>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Document Ref</th>
+                    <th>Vendor / Customer</th>
+                    <th>Document Type</th>
+                    <th className="right">Amount</th>
+                    <th>GL Account</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pastePreview.map((row, index) => (
+                    <tr key={`${row.docRef}-${index}`}>
+                      <td>{row.date}</td>
+                      <td className="mono">{row.docRef}</td>
+                      <td>{row.party}</td>
+                      <td>{row.docType}</td>
+                      <td className="right">RM {formatMoney(row.amount)}</td>
+                      <td className="mono">{row.glAccount || 'Select GL later'}</td>
+                      <td>{row.note}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
+      </section>
+
       <div className="wp1-summary-grid">
         <SummaryCard label="Total Documents" value={summary.totalDocuments.toString()} />
         <SummaryCard label="Posted" tone="green" value={summary.posted.toString()} />
@@ -201,8 +411,18 @@ export function WP1DocumentLedger({ session, onSessionChange }: WP1DocumentLedge
               <span>Reclassifications</span>
               <strong>{session.reclassifyDecisions.length}</strong>
             </div>
-            <button className="primary-button" type="button">
-              Ready for WP2
+            <button
+              className="primary-button"
+              disabled={unresolvedWp1Rows.length > 0}
+              onClick={() => onStepChange('wp2')}
+              title={
+                unresolvedWp1Rows.length
+                  ? 'Complete split, reclassify, and GL account items before moving to WP2.'
+                  : 'Go to WP2 Bank Verification.'
+              }
+              type="button"
+            >
+              {unresolvedWp1Rows.length ? `Fix ${unresolvedWp1Rows.length} WP1 Item(s)` : 'Ready for WP2'}
             </button>
           </>
         }
@@ -279,6 +499,12 @@ export function WP1DocumentLedger({ session, onSessionChange }: WP1DocumentLedge
                         <button className="text-button" onClick={() => setModal({ type: 'edit-gl', document })} type="button">
                           Edit GL
                         </button>
+                        <button className="text-button" onClick={() => setModal({ type: 'edit-document', document })} type="button">
+                          Edit
+                        </button>
+                        <button className="text-button" onClick={() => deleteDocument(document.id)} type="button">
+                          Delete
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -288,6 +514,37 @@ export function WP1DocumentLedger({ session, onSessionChange }: WP1DocumentLedge
           </table>
         </div>
       </WorkpaperFrame>
+
+      {modal?.type === 'add-document' ? (
+        <DocumentModal
+          onClose={() => setModal(null)}
+          onSave={(form) => {
+            onSessionChange((current) => ({
+              ...current,
+              documents: [...current.documents, documentFromForm(form, nextDocumentId(current.documents))],
+              journalVoucherReady: false,
+            }))
+            setModal(null)
+          }}
+        />
+      ) : null}
+
+      {modal?.type === 'edit-document' ? (
+        <DocumentModal
+          document={modal.document}
+          onClose={() => setModal(null)}
+          onSave={(form) => {
+            onSessionChange((current) => ({
+              ...current,
+              documents: current.documents.map((document) =>
+                document.id === modal.document.id ? { ...documentFromForm(form, document.id), status: document.status } : document,
+              ),
+              journalVoucherReady: false,
+            }))
+            setModal(null)
+          }}
+        />
+      ) : null}
 
       {modal?.type === 'split' ? (
         <SplitModal
@@ -381,6 +638,87 @@ function SummaryCard({
       <span>{label}</span>
       <strong>{value}</strong>
     </article>
+  )
+}
+
+function DocumentModal({
+  document,
+  onClose,
+  onSave,
+}: {
+  document?: SourceDocument
+  onClose: () => void
+  onSave: (form: DocumentFormState) => void
+}) {
+  const [form, setForm] = useState<DocumentFormState>(formFromDocument(document))
+  const canSave = Boolean(form.date.trim() && form.docRef.trim() && form.party.trim() && form.amount > 0)
+
+  return (
+    <ModalFrame
+      eyebrow="Manual WP1 entry"
+      onClose={onClose}
+      title={document ? 'Edit Document' : 'Add Document'}
+    >
+      <div className="manual-form-grid">
+        <label>
+          <span>Date</span>
+          <input value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
+        </label>
+        <label>
+          <span>Document Ref</span>
+          <input value={form.docRef} onChange={(event) => setForm({ ...form, docRef: event.target.value })} />
+        </label>
+        <label>
+          <span>Vendor / Customer</span>
+          <input value={form.party} onChange={(event) => setForm({ ...form, party: event.target.value })} />
+        </label>
+        <label>
+          <span>Document Type</span>
+          <select
+            value={form.docType}
+            onChange={(event) => setForm({ ...form, docType: event.target.value as DocumentType })}
+          >
+            {documentTypes.map((type) => (
+              <option key={type}>{type}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Amount</span>
+          <input
+            min="0"
+            step="0.01"
+            type="number"
+            value={form.amount}
+            onChange={(event) => setForm({ ...form, amount: Number(event.target.value) })}
+          />
+        </label>
+        <label>
+          <span>GL Account</span>
+          <select value={form.glAccount} onChange={(event) => setForm({ ...form, glAccount: event.target.value })}>
+            <option value="">Select later</option>
+            {accountsForDocumentType(form.docType).map((account) => (
+              <option key={account.code} value={formatAccount(account)}>
+                {formatAccount(account)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="wide-field">
+          <span>Notes</span>
+          <input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} />
+        </label>
+      </div>
+
+      <div className="modal-actions">
+        <button className="secondary-button" onClick={onClose} type="button">
+          Cancel
+        </button>
+        <button className="primary-button" disabled={!canSave} onClick={() => onSave(form)} type="button">
+          Save Document
+        </button>
+      </div>
+    </ModalFrame>
   )
 }
 

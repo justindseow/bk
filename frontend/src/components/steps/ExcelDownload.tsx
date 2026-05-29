@@ -3,6 +3,7 @@ import { buildGeneratedHandoverItems } from '../../state/handoverBuilder'
 import { generateJournalLines } from '../../state/journalBuilder'
 import { buildValidationResults } from '../../state/validation'
 import type { SampleSession } from '../../types/session'
+import { apiBaseUrl } from '../../utils/api'
 import { WorkpaperFrame } from '../layout/WorkpaperFrame'
 
 interface ExcelDownloadProps {
@@ -14,6 +15,16 @@ type ExportHistoryItem = {
   filename: string
   exportedAt: string
   status: 'Downloaded' | 'Failed'
+}
+
+type FeedbackFormState = {
+  testerName: string
+  testerEmail: string
+  rating: string
+  easeOfUse: string
+  confusingStep: string
+  message: string
+  mayContact: boolean
 }
 
 const workbookTabs = [
@@ -77,6 +88,18 @@ export function ExcelDownload({ session }: ExcelDownloadProps) {
   const [exporting, setExporting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [messageType, setMessageType] = useState<'ok' | 'warning' | 'error'>('warning')
+  const [feedback, setFeedback] = useState<FeedbackFormState>({
+    testerName: '',
+    testerEmail: '',
+    rating: 'Good',
+    easeOfUse: 'Mostly easy',
+    confusingStep: '',
+    message: '',
+    mayContact: false,
+  })
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false)
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
+  const [feedbackMessageType, setFeedbackMessageType] = useState<'ok' | 'error'>('ok')
 
   const validation = useMemo(() => buildValidationResults(session), [session])
   const journalLines = useMemo(() => generateJournalLines(session), [session])
@@ -101,7 +124,7 @@ export function ExcelDownload({ session }: ExcelDownloadProps) {
     setMessage(null)
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/export/excel', {
+      const response = await fetch(`${apiBaseUrl()}/export/excel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session: exportSession }),
@@ -157,6 +180,54 @@ export function ExcelDownload({ session }: ExcelDownloadProps) {
       setMessage(friendly)
     } finally {
       setExporting(false)
+    }
+  }
+
+  const submitFeedback = async () => {
+    if (feedback.message.trim().length < 5) {
+      setFeedbackMessageType('error')
+      setFeedbackMessage('Please add a short note before submitting feedback.')
+      return
+    }
+
+    setFeedbackSubmitting(true)
+    setFeedbackMessage(null)
+
+    try {
+      const response = await fetch(`${apiBaseUrl()}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tester_name: feedback.testerName.trim(),
+          tester_email: feedback.testerEmail.trim(),
+          rating: feedback.rating,
+          ease_of_use: feedback.easeOfUse,
+          confusing_step: feedback.confusingStep,
+          message: feedback.message.trim(),
+          may_contact: feedback.mayContact,
+          entity: session.client.entityName,
+          period: session.client.period,
+          journal_voucher_finalised: session.journalVoucherFinalised,
+          critical_issues: validation.summary.criticalIssues,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+
+      setFeedbackMessageType('ok')
+      setFeedbackMessage('Thank you. Your feedback was sent.')
+      setFeedback((current) => ({ ...current, message: '', confusingStep: '' }))
+    } catch (error) {
+      setFeedbackMessageType('error')
+      setFeedbackMessage(
+        error instanceof TypeError
+          ? 'Feedback service is not running. Please start the backend and try again.'
+          : 'Feedback could not be sent right now. Please try again later.',
+      )
+    } finally {
+      setFeedbackSubmitting(false)
     }
   }
 
@@ -268,6 +339,108 @@ export function ExcelDownload({ session }: ExcelDownloadProps) {
           ) : (
             <div className="handover-empty">No downloads in this browser session yet.</div>
           )}
+        </section>
+
+        <section className="feedback-panel">
+          <div className="feedback-head">
+            <span>BK feedback</span>
+            <h3>How was this test session?</h3>
+            <p>Your feedback is emailed to the MacroByte reviewer. No feedback is stored in the app.</p>
+          </div>
+
+          {feedbackMessage ? (
+            <div className={`export-message ${feedbackMessageType}`}>{feedbackMessage}</div>
+          ) : null}
+
+          <div className="feedback-grid">
+            <label>
+              <span>Your name</span>
+              <input
+                value={feedback.testerName}
+                onChange={(event) => setFeedback({ ...feedback, testerName: event.target.value })}
+                placeholder="Optional"
+              />
+            </label>
+            <label>
+              <span>Your email</span>
+              <input
+                value={feedback.testerEmail}
+                onChange={(event) => setFeedback({ ...feedback, testerEmail: event.target.value })}
+                placeholder="Optional"
+                type="email"
+              />
+            </label>
+            <label>
+              <span>Overall rating</span>
+              <select
+                value={feedback.rating}
+                onChange={(event) => setFeedback({ ...feedback, rating: event.target.value })}
+              >
+                <option>Excellent</option>
+                <option>Good</option>
+                <option>Okay</option>
+                <option>Needs work</option>
+              </select>
+            </label>
+            <label>
+              <span>Ease of use</span>
+              <select
+                value={feedback.easeOfUse}
+                onChange={(event) => setFeedback({ ...feedback, easeOfUse: event.target.value })}
+              >
+                <option>Very easy</option>
+                <option>Mostly easy</option>
+                <option>Some parts confusing</option>
+                <option>Hard to follow</option>
+              </select>
+            </label>
+            <label className="wide-field">
+              <span>Which step was confusing?</span>
+              <select
+                value={feedback.confusingStep}
+                onChange={(event) => setFeedback({ ...feedback, confusingStep: event.target.value })}
+              >
+                <option value="">None / not sure</option>
+                <option>Document Collection</option>
+                <option>WP1 Document Posting Ledger</option>
+                <option>WP2 Bank Verification</option>
+                <option>Adjusting Entries</option>
+                <option>Review and Validation</option>
+                <option>Journal Voucher</option>
+                <option>Handover Note</option>
+                <option>Excel Download</option>
+              </select>
+            </label>
+            <label className="wide-field">
+              <span>Feedback notes</span>
+              <textarea
+                value={feedback.message}
+                onChange={(event) => setFeedback({ ...feedback, message: event.target.value })}
+                placeholder="What felt easy, confusing, missing, or different from the real BK workflow?"
+                rows={5}
+              />
+            </label>
+          </div>
+
+          <label className="feedback-checkbox">
+            <input
+              checked={feedback.mayContact}
+              onChange={(event) => setFeedback({ ...feedback, mayContact: event.target.checked })}
+              type="checkbox"
+            />
+            <span>You may contact me about this feedback.</span>
+          </label>
+
+          <div className="feedback-actions">
+            <button
+              className="primary-button"
+              disabled={feedbackSubmitting}
+              onClick={submitFeedback}
+              type="button"
+            >
+              {feedbackSubmitting ? 'Sending Feedback...' : 'Submit Feedback'}
+            </button>
+          </div>
         </section>
       </WorkpaperFrame>
     </>

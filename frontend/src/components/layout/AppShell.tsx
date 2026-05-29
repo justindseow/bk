@@ -56,6 +56,10 @@ export function AppShell({ activeStep, session, children, onStepChange }: AppShe
             <span className="topbar-label">Bank</span>
             <strong>{session.client.bankAccount}</strong>
           </div>
+          <div className="topbar-mode">
+            <span className="topbar-label">Testing Mode</span>
+            <strong>Session only</strong>
+          </div>
         </header>
 
         <main className="content-area">{children}</main>

@@ -25,38 +25,46 @@ const stepComponents: Record<ReadOnlyStepId, ComponentType<{ session: SampleSess
   collection: DocumentCollection,
 }
 
-const pageGuidance: Record<WorkflowStepId, { helper: string; nextAction: string }> = {
+const pageGuidance: Record<WorkflowStepId, { helper: string; nextAction: string; steps: string[] }> = {
   collection: {
     helper: 'Collect the month source documents first. Keep the bank statement ready, but use it after WP1.',
     nextAction: 'Next action: open WP1 and start posting the source documents.',
+    steps: ['Check that source documents are available.', 'Keep the bank statement aside.', 'Move to WP1 when ready.'],
   },
   wp1: {
     helper: 'Post each source document into the ledger. Complete splits, reclassifications, and missing GL accounts before moving to bank verification.',
     nextAction: 'Next action: clear Needs Split, Reclassify, and Pending Review rows.',
+    steps: ['Add or paste document rows.', 'Fix any Split, Reclassify, or Select GL rows.', 'Move to WP2 after document rows are clean.'],
   },
   wp2: {
     helper: 'Verify bank movements against the WP1 documents. Add bank-only entries only where no source document exists.',
     nextAction: 'Next action: resolve Match Multiple, New, and Needs Review bank rows.',
+    steps: ['Add or paste bank statement rows.', 'Match bank rows to WP1 documents.', 'Record bank-only or timing items where needed.'],
   },
   adjusting: {
     helper: 'Post month-end entries that do not have a bank movement, such as reversals, accruals, and depreciation.',
     nextAction: 'Next action: confirm due reversals and post any required depreciation.',
+    steps: ['Confirm reversals.', 'Add accruals if needed.', 'Post depreciation for capitalised assets.'],
   },
   review: {
     helper: 'Run the final control checks before the Journal Voucher. Critical items must be cleared before finalisation.',
     nextAction: 'Next action: use each issue button to return to the step that needs attention.',
+    steps: ['Click Run Validation.', 'Open the linked step for any critical issue.', 'Finalise for JV when all critical issues are cleared.'],
   },
   journal: {
     helper: 'Review the generated Journal Voucher and finalise it only when validation has passed.',
     nextAction: 'Next action: finalise the Journal Voucher or return to Review and Validation.',
+    steps: ['Check total debit and credit.', 'Confirm validation status is ready.', 'Finalise the Journal Voucher.'],
   },
   handover: {
     helper: 'Prepare the next-month handover note from timing items, reversals, recurring entries, and carry-forward schedules.',
     nextAction: 'Next action: review the checklist and add any manual notes for next month.',
+    steps: ['Review generated checklist items.', 'Add any manual note.', 'Mark items noted or not applicable.'],
   },
   download: {
     helper: 'Download the end-of-session workbook for filing and next-month continuity.',
     nextAction: 'Next action: start the backend, then download the Excel workbook.',
+    steps: ['Check readiness warnings.', 'Start the backend if Excel export is offline.', 'Download the workbook and open it in Excel.'],
   },
 }
 
@@ -71,6 +79,9 @@ function App() {
     [activeStep],
   )
   const guidance = pageGuidance[activeStep]
+  const activeIndex = workflowSteps.findIndex((step) => step.id === activeStep)
+  const previousStep = activeIndex > 0 ? workflowSteps[activeIndex - 1] : undefined
+  const nextStep = activeIndex >= 0 && activeIndex < workflowSteps.length - 1 ? workflowSteps[activeIndex + 1] : undefined
   const journalVoucherNeedsReview = session.journalVoucherFinalised && !snapshotMatchesCurrent(session)
   const ActiveStep =
     activeStep === 'wp1' ||
@@ -97,6 +108,23 @@ function App() {
           <strong>{guidance.helper}</strong>
           <span>{guidance.nextAction}</span>
         </div>
+        <ol className="guidance-steps">
+          {guidance.steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+        <div className="page-guidance-actions">
+          {previousStep ? (
+            <button className="secondary-button" onClick={() => setActiveStep(previousStep.id)} type="button">
+              Back: {previousStep.shortTitle}
+            </button>
+          ) : null}
+          {nextStep ? (
+            <button className="primary-button" onClick={() => setActiveStep(nextStep.id)} type="button">
+              Next: {nextStep.shortTitle}
+            </button>
+          ) : null}
+        </div>
       </section>
       {journalVoucherNeedsReview ? (
         <section className="session-warning">
@@ -110,7 +138,11 @@ function App() {
         onStepChange={setActiveStep}
       />
       {activeStep === 'wp1' ? (
-        <WP1DocumentLedger onSessionChange={setSession} session={session} />
+        <WP1DocumentLedger
+          onSessionChange={setSession}
+          onStepChange={setActiveStep}
+          session={session}
+        />
       ) : activeStep === 'wp2' ? (
         <WP2BankVerification onSessionChange={setSession} session={session} />
       ) : activeStep === 'adjusting' ? (

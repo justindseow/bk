@@ -11,6 +11,31 @@ export function createCleanDemoSession(): SampleSession {
   return cloneSession(sampleSession)
 }
 
+export function createBlankBkTestSession(current: SampleSession = sampleSession): SampleSession {
+  return {
+    ...cloneSession(sampleSession),
+    client: { ...current.client },
+    journalVoucherReady: false,
+    journalVoucherFinalised: false,
+    journalVoucherFinalisedAt: undefined,
+    finalisedJournalLinesSnapshot: [],
+    documents: [],
+    splitDecisions: [],
+    reclassifyDecisions: [],
+    bankRows: [],
+    bankMatches: [],
+    bankOnlyEntries: [],
+    timingItems: [],
+    priorAccruals: [],
+    adjustingEntries: [],
+    futureReversalItems: [],
+    depreciationSchedule: [],
+    checklistItems: [],
+    handoverItems: [],
+    manualHandoverItems: [],
+  }
+}
+
 export function makeWp1Ready(session: SampleSession): SampleSession {
   const next = cloneSession(session)
 
