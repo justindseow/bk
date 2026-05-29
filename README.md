@@ -102,52 +102,38 @@ This should download a small workbook that opens in Excel.
 
 ## Shareable Test Link
 
-For BK testing through a shareable web link, deploy both parts:
+For BK testing through a shareable web link, deploy the app as one Vercel project. Vercel hosts the Vite frontend and the FastAPI endpoints under the same domain.
 
-1. Deploy the backend FastAPI app, for example on Render.
-2. Deploy the frontend Vite app, for example on Netlify or Vercel.
-3. Set the frontend environment variable:
+1. Go to Vercel and import `https://github.com/justindseow/bk`.
+2. Keep the project root as the repository root.
+3. Vercel should use `vercel.json`.
+4. Share the Vercel frontend URL with the BK.
 
-```text
-VITE_API_BASE_URL=https://your-backend-service.example
-```
-
-4. Set the backend CORS origin:
+Vercel build settings if entered manually:
 
 ```text
-FRONTEND_ORIGINS=https://your-frontend-site.example
+Install command: cd frontend && npm install
+Build command: cd frontend && npm run build
+Output directory: frontend/dist
 ```
 
-5. Share the frontend URL with the BK.
+The backend routes are served by Vercel Python Functions:
+
+```text
+GET /health
+POST /export/excel
+GET /export/test-excel
+POST /feedback
+```
+
+No `VITE_API_BASE_URL` is needed on Vercel when frontend and API are deployed together. For local development, keep `VITE_API_BASE_URL=http://127.0.0.1:8000`.
+
+Useful Vercel references:
+
+- Vite on Vercel: https://vercel.com/docs/frameworks/vite
+- FastAPI on Vercel: https://vercel.com/docs/frameworks/backend/fastapi
 
 Keep the testing instruction clear: use sanitised test data only unless authorised.
-
-Useful deployment references:
-
-- Netlify Vite deploy: https://docs.netlify.com/build/frameworks/framework-setup-guides/vite/
-- Vercel Vite deploy: https://examples.vercel.com/docs/frameworks/vite
-- Render FastAPI deploy: https://render.com/docs/deploy-fastapi
-
-Frontend deployment settings:
-
-```text
-Root directory: frontend
-Build command: npm run build
-Publish directory: frontend/dist
-```
-
-Backend deployment settings:
-
-```text
-Root directory: backend
-Build command: pip install -r requirements.txt
-Start command: uvicorn main:app --host 0.0.0.0 --port $PORT
-```
-
-This repo also includes:
-
-- `netlify.toml` for Netlify frontend deployment.
-- `render.yaml` for Render backend deployment.
 
 ## Feedback Email Setup
 
