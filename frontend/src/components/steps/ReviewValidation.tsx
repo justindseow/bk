@@ -80,7 +80,6 @@ export function ReviewValidation({ session, onSessionChange, onStepChange }: Rev
             Finalise for Journal Voucher
           </button>
           <small>{lastRunAt}</small>
-          {!validation.ready ? <small>Finalise is available after critical issues are cleared.</small> : null}
         </div>
       </section>
 
