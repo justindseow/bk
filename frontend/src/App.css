@@ -1547,7 +1547,7 @@
 }
 
 .adjusting-table {
-  min-width: 980px;
+  min-width: 1180px;
 }
 
 .depreciation-table {
@@ -1557,6 +1557,39 @@
 .adjust-action {
   border-color: #5eead4;
   color: var(--teal);
+}
+
+.adjusting-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 112px;
+}
+
+.adjusting-edit-stack {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.adjusting-edit-input,
+.adjusting-edit-select {
+  background: var(--white);
+  border: 1px solid #dde4ec;
+  border-radius: 4px;
+  color: #1f2d3d;
+  font-size: 11px;
+  min-height: 30px;
+  padding: 5px 7px;
+  width: 100%;
+}
+
+.adjusting-edit-input.right {
+  text-align: right;
+}
+
+.adjusting-edit-select {
+  min-width: 180px;
 }
 
 .accrual-grid {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
-import { findAccount } from '../../data/accounts'
+import { accountOptions, findAccount, formatAccount } from '../../data/accounts'
 import { generateDraftJournalLinesFromAdjustingEntries } from '../../state/journalBuilder'
 import type {
   AccountOption,
@@ -18,6 +18,16 @@ interface AdjustingEntriesProps {
 }
 
 type AdjustingTab = 'reversals' | 'accruals' | 'depreciation'
+
+type AdjustingEntryEditForm = {
+  date: string
+  description: string
+  debitAccount: string
+  creditAccount: string
+  amount: number
+  reverseNextMonth: boolean
+  notes: string
+}
 
 const expenseAccounts = ['6100', '6210', '6320', '6380', '6700']
   .map((code) => findAccount(code))
@@ -43,6 +53,28 @@ const statusClass = (status: string) => `badge badge-${statusKey(status)}`
 
 const nextAdjustingId = (entries: AdjustingEntry[]) =>
   `ADJ-${String(entries.length + 1).padStart(2, '0')}`
+
+const accountCodeFromText = (accountText: string) => accountText.split(' - ')[0]?.trim() ?? ''
+
+const buildFutureReversal = (entry: AdjustingEntry): FutureReversalItem => {
+  const debitCode = accountCodeFromText(entry.debitAccount) || entry.debitAccount
+  const creditCode = accountCodeFromText(entry.creditAccount) || entry.creditAccount
+
+  return {
+    id: `FR-${entry.id}`,
+    adjustingEntryId: entry.id,
+    action: `Reverse ${entry.description}`,
+    entryReference: `DR: ${creditCode}  CR: ${debitCode}`,
+    amount: entry.amount,
+    duePeriod: 'February 2025',
+    notes: entry.notes || 'Reverse at the start of next month.',
+  }
+}
+
+const syncFutureReversal = (items: FutureReversalItem[], entry: AdjustingEntry) => {
+  const remaining = items.filter((item) => item.adjustingEntryId !== entry.id)
+  return entry.type === 'Accrual' && entry.reverseNextMonth ? [...remaining, buildFutureReversal(entry)] : remaining
+}
 
 const buildDepreciationAssets = (session: SampleSession) => {
   const existingByDocument = new Map(session.depreciationSchedule.map((item) => [item.documentId, item]))
@@ -205,6 +237,65 @@ export function AdjustingEntries({ session, onSessionChange }: AdjustingEntriesP
     })
   }
 
+  const updateAdjustingEntry = (entryId: string, form: AdjustingEntryEditForm) => {
+    onSessionChange((current) => {
+      const existingEntry = current.adjustingEntries.find((entry) => entry.id === entryId)
+      if (!existingEntry) return current
+
+      const nextEntry: AdjustingEntry = {
+        ...existingEntry,
+        date: form.date,
+        description: form.description.trim(),
+        debitAccount: form.debitAccount,
+        creditAccount: form.creditAccount,
+        amount: Number(form.amount || 0),
+        reverseNextMonth: existingEntry.type === 'Accrual' ? form.reverseNextMonth : false,
+        notes: form.notes.trim(),
+      }
+
+      const nextDepreciationSchedule =
+        existingEntry.type === 'Depreciation' && existingEntry.sourceId
+          ? current.depreciationSchedule.map((item) =>
+              item.documentId === existingEntry.sourceId
+                ? {
+                    ...item,
+                    monthlyDepreciation: nextEntry.amount,
+                    accumulatedDepreciationAccount: nextEntry.creditAccount,
+                    depreciationExpenseAccount: nextEntry.debitAccount,
+                  }
+                : item,
+            )
+          : current.depreciationSchedule
+
+      return {
+        ...current,
+        adjustingEntries: current.adjustingEntries.map((entry) => (entry.id === entryId ? nextEntry : entry)),
+        depreciationSchedule: nextDepreciationSchedule,
+        futureReversalItems: syncFutureReversal(current.futureReversalItems, nextEntry),
+      }
+    })
+  }
+
+  const deleteAdjustingEntry = (entryToDelete: AdjustingEntry) => {
+    onSessionChange((current) => ({
+      ...current,
+      adjustingEntries: current.adjustingEntries.filter((entry) => entry.id !== entryToDelete.id),
+      futureReversalItems: current.futureReversalItems.filter((item) => item.adjustingEntryId !== entryToDelete.id),
+      priorAccruals:
+        entryToDelete.type === 'Reversal' && entryToDelete.sourceId
+          ? current.priorAccruals.map((item) =>
+              item.id === entryToDelete.sourceId ? { ...item, status: 'Pending' } : item,
+            )
+          : current.priorAccruals,
+      depreciationSchedule:
+        entryToDelete.type === 'Depreciation' && entryToDelete.sourceId
+          ? current.depreciationSchedule.map((item) =>
+              item.documentId === entryToDelete.sourceId ? { ...item, status: 'Ready to Post' } : item,
+            )
+          : current.depreciationSchedule,
+    }))
+  }
+
   return (
     <>
       <div className="wp1-summary-grid">
@@ -287,7 +378,11 @@ export function AdjustingEntries({ session, onSessionChange }: AdjustingEntriesP
         ) : null}
       </WorkpaperFrame>
 
-      <AdjustingEntryList entries={session.adjustingEntries} />
+      <AdjustingEntryList
+        entries={session.adjustingEntries}
+        onDelete={deleteAdjustingEntry}
+        onUpdate={updateAdjustingEntry}
+      />
     </>
   )
 }
@@ -569,7 +664,55 @@ function DepreciationTab({
   )
 }
 
-function AdjustingEntryList({ entries }: { entries: AdjustingEntry[] }) {
+function AdjustingEntryList({
+  entries,
+  onDelete,
+  onUpdate,
+}: {
+  entries: AdjustingEntry[]
+  onDelete: (entry: AdjustingEntry) => void
+  onUpdate: (entryId: string, form: AdjustingEntryEditForm) => void
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<AdjustingEntryEditForm | null>(null)
+
+  const accountValues = accountOptions.map((account) => formatAccount(account))
+
+  const startEditing = (entry: AdjustingEntry) => {
+    setEditingId(entry.id)
+    setEditForm({
+      date: entry.date,
+      description: entry.description,
+      debitAccount: entry.debitAccount,
+      creditAccount: entry.creditAccount,
+      amount: entry.amount,
+      reverseNextMonth: entry.reverseNextMonth,
+      notes: entry.notes ?? '',
+    })
+  }
+
+  const cancelEditing = () => {
+    setEditingId(null)
+    setEditForm(null)
+  }
+
+  const saveEditing = () => {
+    if (!editingId || !editForm) return
+    onUpdate(editingId, editForm)
+    cancelEditing()
+  }
+
+  const optionsForAccount = (value: string) =>
+    value && !accountValues.includes(value) ? [value, ...accountValues] : accountValues
+
+  const canSave = Boolean(
+    editForm?.date.trim() &&
+      editForm.description.trim() &&
+      editForm.debitAccount &&
+      editForm.creditAccount &&
+      Number(editForm.amount || 0) > 0,
+  )
+
   return (
     <WorkpaperFrame
       period="Current session"
@@ -588,28 +731,142 @@ function AdjustingEntryList({ entries }: { entries: AdjustingEntry[] }) {
               <th className="right">Amount</th>
               <th>Reverse Next Month</th>
               <th>Status</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
-            {entries.map((entry) => (
-              <tr key={entry.id}>
-                <td>{entry.date}</td>
-                <td>
-                  <span className="source source-adjusting">{entry.type}</span>
-                </td>
-                <td>
-                  <strong>{entry.description}</strong>
-                  {entry.notes ? <small>{entry.notes}</small> : null}
-                </td>
-                <td className="mono">{entry.debitAccount}</td>
-                <td className="mono">{entry.creditAccount}</td>
-                <td className="right amount-in">RM {formatMoney(entry.amount)}</td>
-                <td>{entry.reverseNextMonth ? 'Yes' : 'No'}</td>
-                <td>
-                  <span className={statusClass(entry.status)}>{entry.status}</span>
-                </td>
-              </tr>
-            ))}
+            {entries.map((entry) => {
+              const isEditing = editingId === entry.id && editForm
+
+              return (
+                <tr key={entry.id}>
+                  <td>
+                    {isEditing ? (
+                      <input
+                        className="adjusting-edit-input"
+                        value={editForm.date}
+                        onChange={(event) => setEditForm({ ...editForm, date: event.target.value })}
+                      />
+                    ) : (
+                      entry.date
+                    )}
+                  </td>
+                  <td>
+                    <span className="source source-adjusting">{entry.type}</span>
+                  </td>
+                  <td>
+                    {isEditing ? (
+                      <div className="adjusting-edit-stack">
+                        <input
+                          className="adjusting-edit-input"
+                          value={editForm.description}
+                          onChange={(event) => setEditForm({ ...editForm, description: event.target.value })}
+                        />
+                        <input
+                          className="adjusting-edit-input"
+                          placeholder="Notes"
+                          value={editForm.notes}
+                          onChange={(event) => setEditForm({ ...editForm, notes: event.target.value })}
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <strong>{entry.description}</strong>
+                        {entry.notes ? <small>{entry.notes}</small> : null}
+                      </>
+                    )}
+                  </td>
+                  <td className="mono">
+                    {isEditing ? (
+                      <select
+                        className="adjusting-edit-select"
+                        value={editForm.debitAccount}
+                        onChange={(event) => setEditForm({ ...editForm, debitAccount: event.target.value })}
+                      >
+                        {optionsForAccount(editForm.debitAccount).map((account) => (
+                          <option key={account} value={account}>
+                            {account}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      entry.debitAccount
+                    )}
+                  </td>
+                  <td className="mono">
+                    {isEditing ? (
+                      <select
+                        className="adjusting-edit-select"
+                        value={editForm.creditAccount}
+                        onChange={(event) => setEditForm({ ...editForm, creditAccount: event.target.value })}
+                      >
+                        {optionsForAccount(editForm.creditAccount).map((account) => (
+                          <option key={account} value={account}>
+                            {account}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      entry.creditAccount
+                    )}
+                  </td>
+                  <td className="right amount-in">
+                    {isEditing ? (
+                      <input
+                        className="adjusting-edit-input right"
+                        min="0"
+                        step="0.01"
+                        type="number"
+                        value={editForm.amount}
+                        onChange={(event) => setEditForm({ ...editForm, amount: Number(event.target.value) })}
+                      />
+                    ) : (
+                      <>RM {formatMoney(entry.amount)}</>
+                    )}
+                  </td>
+                  <td>
+                    {isEditing && entry.type === 'Accrual' ? (
+                      <select
+                        className="adjusting-edit-select"
+                        value={editForm.reverseNextMonth ? 'yes' : 'no'}
+                        onChange={(event) =>
+                          setEditForm({ ...editForm, reverseNextMonth: event.target.value === 'yes' })
+                        }
+                      >
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </select>
+                    ) : (
+                      entry.reverseNextMonth ? 'Yes' : 'No'
+                    )}
+                  </td>
+                  <td>
+                    <span className={statusClass(entry.status)}>{entry.status}</span>
+                  </td>
+                  <td>
+                    {isEditing ? (
+                      <div className="adjusting-row-actions">
+                        <button className="text-button adjust-action" disabled={!canSave} onClick={saveEditing} type="button">
+                          Save
+                        </button>
+                        <button className="text-button" onClick={cancelEditing} type="button">
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="adjusting-row-actions">
+                        <button className="text-button adjust-action" onClick={() => startEditing(entry)} type="button">
+                          Edit
+                        </button>
+                        <button className="text-button" onClick={() => onDelete(entry)} type="button">
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
