@@ -93,6 +93,8 @@ export interface SourceIntakeItem {
   moneyOut: number
   suggestedGlAccount: string
   notes: string
+  evidence?: string[]
+  warnings?: string[]
   rawPreview?: string
 }
 

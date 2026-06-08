@@ -1056,7 +1056,7 @@
 }
 
 .intake-table {
-  min-width: 1380px;
+  min-width: 1480px;
 }
 
 .intake-table input,
@@ -1103,6 +1103,31 @@
 
 .intake-actions {
   min-width: 110px;
+}
+
+.intake-suggestion {
+  display: grid;
+  gap: 4px;
+  min-width: 190px;
+}
+
+.intake-suggestion span,
+.intake-suggestion strong {
+  border-radius: 4px;
+  display: block;
+  font-size: 10px;
+  line-height: 1.3;
+  padding: 4px 6px;
+}
+
+.intake-suggestion span {
+  background: var(--blue-light);
+  color: var(--blue);
+}
+
+.intake-suggestion strong {
+  background: var(--gold-light);
+  color: var(--gold);
 }
 
 .intake-empty-state {

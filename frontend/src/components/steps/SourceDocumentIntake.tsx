@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { accountsForDocumentType, formatAccount } from '../../data/accounts'
+import { accountsForDocumentType, findAccount, formatAccount } from '../../data/accounts'
 import type {
   BankRow,
   DocumentType,
@@ -20,6 +20,12 @@ interface SourceDocumentIntakeProps {
 
 type IntakePatch = Partial<Omit<SourceIntakeItem, 'id'>>
 
+type DetectionResult = Pick<SourceIntakeItem, 'detectedType' | 'confidence' | 'target'> & {
+  evidence: string[]
+  warnings: string[]
+  suggestedGlAccount: string
+}
+
 const documentTypes: DocumentType[] = [
   'Sales Invoice',
   'Purchase Invoice',
@@ -35,6 +41,29 @@ const intakeTypes: IntakeDocumentType[] = [...documentTypes, 'Bank Statement', '
 
 const readableFileExtensions = ['csv', 'txt', 'tsv']
 
+const smartRules: Array<{
+  label: string
+  type: IntakeDocumentType
+  target: IntakeTarget
+  accountCode?: string
+  keywords: string[]
+}> = [
+  { label: 'Bank statement layout', type: 'Bank Statement', target: 'WP2', keywords: ['bank statement', 'account statement', 'opening balance', 'closing balance'] },
+  { label: 'Bank transaction columns', type: 'Bank Statement', target: 'WP2', keywords: ['money in', 'money out', 'debit', 'credit', 'balance'] },
+  { label: 'TNB utilities', type: 'Utility Bill', target: 'WP1', accountCode: '6210', keywords: ['tnb', 'tenaga', 'electricity', 'utility'] },
+  { label: 'Water utility', type: 'Utility Bill', target: 'WP1', accountCode: '6210', keywords: ['air selangor', 'water bill', 'utility'] },
+  { label: 'Merchant payout', type: 'Merchant Statement', target: 'WP1', accountCode: '4120', keywords: ['grab', 'foodpanda', 'merchant', 'payout', 'settlement'] },
+  { label: 'Payroll support', type: 'Payroll Summary', target: 'WP1', accountCode: '6100', keywords: ['payroll', 'salary', 'epf', 'socso', 'eis', 'pcb'] },
+  { label: 'Loan repayment support', type: 'Loan / HP Statement', target: 'WP1', accountCode: '2700', keywords: ['loan', 'hire purchase', 'principal', 'interest', 'instalment'] },
+  { label: 'Insurance / takaful', type: 'Payment Voucher', target: 'WP1', accountCode: '6380', keywords: ['insurance', 'takaful', 'premium'] },
+  { label: 'Rent payment', type: 'Payment Voucher', target: 'WP1', accountCode: '6200', keywords: ['rental', 'rent', 'landlord'] },
+  { label: 'Bank charges', type: 'Bank Statement', target: 'WP2', accountCode: '6370', keywords: ['bank charge', 'bank fee', 'service charge', 'charges'] },
+  { label: 'Sales invoice', type: 'Sales Invoice', target: 'WP1', accountCode: '4100', keywords: ['sales invoice', 'customer invoice', 'invoice to'] },
+  { label: 'Supplier invoice', type: 'Purchase Invoice', target: 'WP1', accountCode: '5020', keywords: ['supplier invoice', 'purchase invoice', 'vendor invoice', 'bill from'] },
+  { label: 'Receipt', type: 'Receipt', target: 'WP1', accountCode: '4100', keywords: ['official receipt', 'receipt'] },
+  { label: 'Payment voucher', type: 'Payment Voucher', target: 'WP1', accountCode: '5020', keywords: ['payment voucher', 'pv'] },
+]
+
 const formatMoney = (amount: number) =>
   new Intl.NumberFormat('en-MY', {
     minimumFractionDigits: 2,
@@ -46,6 +75,14 @@ const parseAmount = (value: string) => {
   const amount = Number(normalized)
   if (!Number.isFinite(amount)) return 0
   return value.includes('(') && value.includes(')') ? Math.abs(amount) : Math.abs(amount)
+}
+
+const parseSignedAmount = (value: string) => {
+  const trimmed = value.trim()
+  const amount = parseAmount(trimmed)
+  if (!amount) return { amount: 0, direction: 'IN' as const }
+  const isOut = trimmed.startsWith('-') || (trimmed.includes('(') && trimmed.includes(')'))
+  return { amount, direction: isOut ? 'OUT' as const : 'IN' as const }
 }
 
 const cleanWords = (value: string) =>
@@ -75,28 +112,54 @@ const readFileText = (file: File) =>
     reader.readAsText(file)
   })
 
-const detectType = (fileName: string, text: string): Pick<SourceIntakeItem, 'detectedType' | 'confidence' | 'target'> => {
+const accountLabel = (code?: string) => {
+  const account = code ? findAccount(code) : undefined
+  return account ? formatAccount(account) : ''
+}
+
+const detectType = (fileName: string, text: string): DetectionResult => {
   const content = normalize(`${fileName} ${text.slice(0, 2000)}`)
+  const ranked = smartRules
+    .map((rule) => {
+      const hits = rule.keywords.filter((keyword) => content.includes(keyword))
+      return { rule, hits, score: hits.length }
+    })
+    .filter((result) => result.score > 0)
+    .sort((a, b) => b.score - a.score)
 
-  const rules: Array<{ type: IntakeDocumentType; target: IntakeTarget; keywords: string[] }> = [
-    { type: 'Bank Statement', target: 'WP2', keywords: ['bank statement', 'account statement', 'cimb', 'maybank', 'public bank', 'debit', 'credit', 'balance'] },
-    { type: 'Merchant Statement', target: 'WP1', keywords: ['merchant', 'grab', 'foodpanda', 'payout', 'settlement'] },
-    { type: 'Payroll Summary', target: 'WP1', keywords: ['payroll', 'salary', 'epf', 'socso', 'eis', 'pcb'] },
-    { type: 'Loan / HP Statement', target: 'WP1', keywords: ['loan', 'hire purchase', 'hp', 'principal', 'interest'] },
-    { type: 'Utility Bill', target: 'WP1', keywords: ['tnb', 'tenaga', 'utility', 'electricity', 'water', 'indah water'] },
-    { type: 'Sales Invoice', target: 'WP1', keywords: ['sales invoice', 'invoice to customer', 'customer invoice'] },
-    { type: 'Purchase Invoice', target: 'WP1', keywords: ['supplier invoice', 'purchase invoice', 'vendor invoice', 'bill'] },
-    { type: 'Payment Voucher', target: 'WP1', keywords: ['payment voucher', 'pv', 'payment'] },
-    { type: 'Receipt', target: 'WP1', keywords: ['receipt', 'official receipt'] },
-  ]
+  const best = ranked[0]
 
-  for (const rule of rules) {
-    const hits = rule.keywords.filter((keyword) => content.includes(keyword)).length
-    if (hits >= 2) return { detectedType: rule.type, confidence: 'High', target: rule.target }
-    if (hits === 1) return { detectedType: rule.type, confidence: 'Medium', target: rule.target }
+  if (best) {
+    const confidence = best.score >= 2 ? 'High' : 'Medium'
+    const evidence = [`Matched ${best.rule.label}: ${best.hits.join(', ')}`]
+    const warnings = confidence === 'Medium' ? ['Only one strong clue found. Review before posting.'] : []
+
+    if (
+      ranked[1] &&
+      ranked[1].score === best.score &&
+      ranked[1].rule.type !== best.rule.type
+    ) {
+      warnings.push(`Also looked like ${ranked[1].rule.type}.`)
+    }
+
+    return {
+      detectedType: best.rule.type,
+      confidence,
+      target: best.rule.target,
+      evidence,
+      warnings,
+      suggestedGlAccount: accountLabel(best.rule.accountCode) || suggestedAccountForType(best.rule.type),
+    }
   }
 
-  return { detectedType: 'Unknown', confidence: 'Low', target: 'WP1' }
+  return {
+    detectedType: 'Unknown',
+    confidence: 'Low',
+    target: 'WP1',
+    evidence: ['No reliable keyword pattern matched.'],
+    warnings: ['Imported as a WP1 review item. Choose document type and GL in WP1.'],
+    suggestedGlAccount: '',
+  }
 }
 
 const extractDate = (source: string) => {
@@ -192,14 +255,34 @@ const parseTabularRows = (text: string, file: File, uploadedAt: string): SourceI
   return lines.slice(1, 51).map((line, index) => {
     const cells = splitDelimitedLine(line, delimiter)
     const rowText = cells.join(' ')
-    const detection = looksLikeBank
-      ? { detectedType: 'Bank Statement' as const, confidence: 'High' as const, target: 'WP2' as const }
+    const detection: DetectionResult = looksLikeBank
+      ? {
+          detectedType: 'Bank Statement',
+          confidence: 'High',
+          target: 'WP2',
+          evidence: ['Detected bank-style columns in uploaded file.'],
+          warnings: [],
+          suggestedGlAccount: '',
+        }
       : detectType(`${file.name} ${cells[typeIndex] ?? ''}`, rowText)
     const typeFromRow = cells[typeIndex] as IntakeDocumentType | undefined
     const detectedType = typeFromRow && intakeTypes.includes(typeFromRow) ? typeFromRow : detection.detectedType
-    const amount = amountIndex >= 0 ? parseAmount(cells[amountIndex] ?? '') : extractLargestAmount(rowText)
-    const moneyIn = moneyInIndex >= 0 ? parseAmount(cells[moneyInIndex] ?? '') : detection.target === 'WP2' && amount > 0 ? amount : 0
-    const moneyOut = moneyOutIndex >= 0 ? parseAmount(cells[moneyOutIndex] ?? '') : 0
+    const signedAmount = amountIndex >= 0 ? parseSignedAmount(cells[amountIndex] ?? '') : { amount: extractLargestAmount(rowText), direction: 'IN' as const }
+    const explicitMoneyIn = moneyInIndex >= 0 ? parseAmount(cells[moneyInIndex] ?? '') : 0
+    const explicitMoneyOut = moneyOutIndex >= 0 ? parseAmount(cells[moneyOutIndex] ?? '') : 0
+    const amount = Math.max(signedAmount.amount, explicitMoneyIn, explicitMoneyOut)
+    const moneyIn =
+      explicitMoneyIn ||
+      (detection.target === 'WP2' && explicitMoneyOut === 0 && signedAmount.direction === 'IN' ? amount : 0)
+    const moneyOut =
+      explicitMoneyOut ||
+      (detection.target === 'WP2' && signedAmount.direction === 'OUT' ? amount : 0)
+    const warnings = [
+      ...detection.warnings,
+      !cells[dateIndex] && !extractDate(rowText) ? 'Date was not detected.' : '',
+      amount <= 0 ? 'Amount was not detected.' : '',
+      typeFromRow && !intakeTypes.includes(typeFromRow) ? `Unknown document type from file: ${typeFromRow}` : '',
+    ].filter(Boolean)
 
     return {
       id: `INT-${Date.now()}-${index}`,
@@ -217,8 +300,10 @@ const parseTabularRows = (text: string, file: File, uploadedAt: string): SourceI
       amount: detection.target === 'WP2' ? Math.max(moneyIn, moneyOut, amount) : amount,
       moneyIn,
       moneyOut,
-      suggestedGlAccount: cells[glIndex] || suggestedAccountForType(detectedType),
+      suggestedGlAccount: cells[glIndex] || detection.suggestedGlAccount || suggestedAccountForType(detectedType),
       notes: cells[notesIndex] || 'Imported from uploaded spreadsheet/CSV.',
+      evidence: detection.evidence,
+      warnings,
       rawPreview: rowText.slice(0, 240),
     }
   })
@@ -235,6 +320,12 @@ const buildIntakeItemsForFile = async (file: File): Promise<SourceIntakeItem[]> 
   const amount = extractLargestAmount(source)
   const reference = extractReference(source, file.name)
   const detectedType = detection.detectedType
+  const warnings = [
+    ...detection.warnings,
+    !extractDate(source) ? 'Date was not detected.' : '',
+    amount <= 0 ? 'Amount was not detected.' : '',
+    !text && !isReadableFile(file) ? 'File content was not readable in-browser. Review downstream fields.' : '',
+  ].filter(Boolean)
 
   return [
     {
@@ -253,8 +344,10 @@ const buildIntakeItemsForFile = async (file: File): Promise<SourceIntakeItem[]> 
       amount,
       moneyIn: detection.target === 'WP2' ? amount : 0,
       moneyOut: 0,
-      suggestedGlAccount: suggestedAccountForType(detectedType),
+      suggestedGlAccount: detection.suggestedGlAccount || suggestedAccountForType(detectedType),
       notes: text ? 'Detected from readable file content.' : 'Detected from file name. Review fields before importing.',
+      evidence: detection.evidence,
+      warnings,
       rawPreview: text.slice(0, 240),
     },
   ]
@@ -285,7 +378,10 @@ const sourceDocumentFromIntake = (item: SourceIntakeItem, id: string, session: S
     : 'Purchase Invoice'
   const amount = Number(item.amount || 0)
   const glAccount = item.suggestedGlAccount.trim()
-  const needsReview = amount <= 0 || !glAccount.trim() || !item.date.trim() || !item.reference.trim()
+  const needsReview = item.confidence !== 'High' || amount <= 0 || !glAccount.trim() || !item.date.trim() || !item.reference.trim()
+  const note = [item.notes.trim(), ...(item.evidence ?? []), ...(item.warnings ?? [])]
+    .filter(Boolean)
+    .join(' ')
 
   return {
     id,
@@ -298,8 +394,8 @@ const sourceDocumentFromIntake = (item: SourceIntakeItem, id: string, session: S
     glAccount,
     status: needsReview ? 'Pending Review' : 'Posted',
     note: needsReview
-      ? 'Imported from source intake. Review missing amount, reference, date, or GL before posting.'
-      : item.notes.trim() || undefined,
+      ? `Imported from source intake. Review before posting. ${note}`.trim()
+      : note || undefined,
   }
 }
 
@@ -309,6 +405,9 @@ const bankRowFromIntake = (item: SourceIntakeItem, id: string, session: SampleSe
   const direction = moneyIn > 0 ? 'CR' : 'DR'
   const amount = moneyIn > 0 ? moneyIn : moneyOut || Number(item.amount || 0)
   const needsReview = amount <= 0 || !item.date.trim() || !item.reference.trim()
+  const remarks = [item.notes.trim(), ...(item.evidence ?? []), ...(item.warnings ?? [])]
+    .filter(Boolean)
+    .join(' ')
 
   return {
     id,
@@ -320,8 +419,8 @@ const bankRowFromIntake = (item: SourceIntakeItem, id: string, session: SampleSe
     status: 'Needs Review',
     matchedTo: 'Review against WP1',
     remarks: needsReview
-      ? 'Imported from source intake. Review missing bank amount, reference, or date.'
-      : item.notes.trim() || 'Imported from source intake.',
+      ? `Imported from source intake. Review missing bank amount, reference, or date. ${remarks}`.trim()
+      : remarks || 'Imported from source intake.',
   }
 }
 
@@ -458,6 +557,7 @@ export function SourceDocumentIntake({ session, onSessionChange, onStepChange }:
                   <th>Party / Description</th>
                   <th className="right">Amount</th>
                   <th>GL / Bank Dir</th>
+                  <th>Suggestion</th>
                   <th>Status</th>
                   <th>Action</th>
                 </tr>
@@ -574,6 +674,17 @@ export function SourceDocumentIntake({ session, onSessionChange, onStepChange }:
                             : null}
                         </select>
                       )}
+                    </td>
+                    <td>
+                      <div className="intake-suggestion">
+                        {(item.evidence ?? []).map((line) => (
+                          <span key={line}>{line}</span>
+                        ))}
+                        {(item.warnings ?? []).map((line) => (
+                          <strong key={line}>{line}</strong>
+                        ))}
+                        {!item.evidence?.length && !item.warnings?.length ? <span>Review downstream.</span> : null}
+                      </div>
                     </td>
                     <td>
                       <span className={`badge badge-${item.status.toLowerCase().replace(/\s+/g, '-')}`}>
