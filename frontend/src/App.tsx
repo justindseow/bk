@@ -17,9 +17,9 @@ import type { SampleSession, WorkflowStepId } from './types/session'
 
 const pageGuidance: Record<WorkflowStepId, { helper: string; nextAction: string; steps: string[] }> = {
   collection: {
-    helper: 'Upload source documents first, review what the app detects, then import accepted rows into WP1 or WP2.',
-    nextAction: 'Next action: add BK test documents and accept the rows that should flow downstream.',
-    steps: ['Upload source documents or CSV exports.', 'Correct document type, amount, and target workpaper.', 'Import accepted rows into WP1 or WP2.'],
+    helper: 'Upload source documents first, choose whether each row belongs in WP1 or WP2, then import for review.',
+    nextAction: 'Next action: add BK test documents and import the review rows downstream.',
+    steps: ['Upload source documents or CSV exports.', 'Correct only the document type or target if needed.', 'Import review rows into WP1 or WP2.'],
   },
   wp1: {
     helper: 'Post each source document into the ledger. Complete splits, reclassifications, and missing GL accounts before moving to bank verification.',

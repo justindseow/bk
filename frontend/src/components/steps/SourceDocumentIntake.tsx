@@ -133,6 +133,17 @@ const suggestedAccountForType = (docType: IntakeDocumentType) => {
   return formatAccount(accountsForDocumentType(docType as DocumentType)[0])
 }
 
+const periodMonthLabel = (period: string) => period.split(/\s+/)[0]?.slice(0, 3) || 'Jan'
+
+const fallbackDate = (session: SampleSession) => `01 ${periodMonthLabel(session.client.period)}`
+
+const fallbackReference = (item: SourceIntakeItem, prefix: string) => {
+  const cleaned = item.reference.trim() || cleanWords(item.fileName).split(' ').slice(0, 3).join('-').toUpperCase()
+  return cleaned || `${prefix}-${item.id.slice(-4).toUpperCase()}`
+}
+
+const fallbackParty = (item: SourceIntakeItem) => item.party.trim() || cleanWords(item.fileName) || 'Review source document'
+
 const splitDelimitedLine = (line: string, delimiter: string) => {
   const cells: string[] = []
   let current = ''
@@ -268,51 +279,59 @@ const nextBankRowId = (rows: BankRow[], offset: number) => {
 const flowForDocumentType = (docType: IntakeDocumentType) =>
   ['Sales Invoice', 'Receipt', 'Merchant Statement'].includes(docType) ? 'IN' : 'OUT'
 
-const sourceDocumentFromIntake = (item: SourceIntakeItem, id: string): SourceDocument => {
+const sourceDocumentFromIntake = (item: SourceIntakeItem, id: string, session: SampleSession): SourceDocument => {
   const docType = documentTypes.includes(item.detectedType as DocumentType)
     ? (item.detectedType as DocumentType)
     : 'Purchase Invoice'
+  const amount = Number(item.amount || 0)
+  const glAccount = item.suggestedGlAccount.trim()
+  const needsReview = amount <= 0 || !glAccount.trim() || !item.date.trim() || !item.reference.trim()
 
   return {
     id,
-    date: item.date.trim(),
-    docRef: item.reference.trim(),
-    party: item.party.trim(),
+    date: item.date.trim() || fallbackDate(session),
+    docRef: fallbackReference(item, 'DOC'),
+    party: fallbackParty(item),
     docType,
-    amount: Number(item.amount || 0),
+    amount,
     flow: flowForDocumentType(docType),
-    glAccount: item.suggestedGlAccount.trim(),
-    status: item.suggestedGlAccount.trim() ? 'Posted' : 'Pending Review',
-    note: item.notes.trim() || undefined,
+    glAccount,
+    status: needsReview ? 'Pending Review' : 'Posted',
+    note: needsReview
+      ? 'Imported from source intake. Review missing amount, reference, date, or GL before posting.'
+      : item.notes.trim() || undefined,
   }
 }
 
-const bankRowFromIntake = (item: SourceIntakeItem, id: string): BankRow => {
+const bankRowFromIntake = (item: SourceIntakeItem, id: string, session: SampleSession): BankRow => {
   const moneyIn = Number(item.moneyIn || 0)
   const moneyOut = Number(item.moneyOut || 0)
   const direction = moneyIn > 0 ? 'CR' : 'DR'
+  const amount = moneyIn > 0 ? moneyIn : moneyOut || Number(item.amount || 0)
+  const needsReview = amount <= 0 || !item.date.trim() || !item.reference.trim()
 
   return {
     id,
-    date: item.date.trim(),
-    description: item.party.trim() || item.fileName,
-    reference: item.reference.trim(),
-    amount: moneyIn > 0 ? moneyIn : moneyOut || Number(item.amount || 0),
+    date: item.date.trim() || fallbackDate(session),
+    description: fallbackParty(item),
+    reference: fallbackReference(item, 'BANK'),
+    amount,
     direction,
     status: 'Needs Review',
     matchedTo: 'Review against WP1',
-    remarks: item.notes.trim() || 'Imported from source intake.',
+    remarks: needsReview
+      ? 'Imported from source intake. Review missing bank amount, reference, or date.'
+      : item.notes.trim() || 'Imported from source intake.',
   }
 }
 
-const canAccept = (item: SourceIntakeItem) =>
-  item.target === 'Ignore' ||
-  Boolean(item.date.trim() && item.reference.trim() && item.party.trim() && Number(item.amount || 0) > 0)
+const canImport = (item: SourceIntakeItem) => item.status !== 'Imported' && item.status !== 'Ignored' && item.target !== 'Ignore'
 
 export function SourceDocumentIntake({ session, onSessionChange, onStepChange }: SourceDocumentIntakeProps) {
   const items = session.sourceIntakeItems
-  const acceptedWp1 = items.filter((item) => item.status === 'Accepted' && item.target === 'WP1')
-  const acceptedWp2 = items.filter((item) => item.status === 'Accepted' && item.target === 'WP2')
+  const importableWp1 = items.filter((item) => canImport(item) && item.target === 'WP1')
+  const importableWp2 = items.filter((item) => canImport(item) && item.target === 'WP2')
+  const importableItems = [...importableWp1, ...importableWp2]
   const needsReview = items.filter((item) => item.status === 'Needs Review').length
 
   const updateItem = (itemId: string, patch: IntakePatch) => {
@@ -337,19 +356,19 @@ export function SourceDocumentIntake({ session, onSessionChange, onStepChange }:
     }))
   }
 
-  const importAccepted = () => {
+  const importReviewRows = () => {
     onSessionChange((current) => {
-      const wp1Items = current.sourceIntakeItems.filter((item) => item.status === 'Accepted' && item.target === 'WP1')
-      const wp2Items = current.sourceIntakeItems.filter((item) => item.status === 'Accepted' && item.target === 'WP2')
-      const documents = wp1Items.map((item, index) => sourceDocumentFromIntake(item, nextDocumentId(current.documents, index)))
-      const bankRows = wp2Items.map((item, index) => bankRowFromIntake(item, nextBankRowId(current.bankRows, index)))
+      const wp1Items = current.sourceIntakeItems.filter((item) => canImport(item) && item.target === 'WP1')
+      const wp2Items = current.sourceIntakeItems.filter((item) => canImport(item) && item.target === 'WP2')
+      const documents = wp1Items.map((item, index) => sourceDocumentFromIntake(item, nextDocumentId(current.documents, index), current))
+      const bankRows = wp2Items.map((item, index) => bankRowFromIntake(item, nextBankRowId(current.bankRows, index), current))
 
       return {
         ...current,
         documents: [...current.documents, ...documents],
         bankRows: [...current.bankRows, ...bankRows],
         sourceIntakeItems: current.sourceIntakeItems.map((item) =>
-          item.status === 'Accepted' && item.target !== 'Ignore' ? { ...item, status: 'Imported' } : item,
+          canImport(item) ? { ...item, status: 'Imported' } : item,
         ),
         journalVoucherReady: false,
       }
@@ -369,7 +388,7 @@ export function SourceDocumentIntake({ session, onSessionChange, onStepChange }:
         <div className="intake-upload-copy">
           <span>Source Document Intake</span>
           <strong>Upload BK test documents before WP1 and WP2.</strong>
-          <p>CSV/TXT rows are read in the browser. PDFs, images, and Excel files become review rows that BKs can correct before importing.</p>
+          <p>Upload first, then send rows downstream. Missing fields are flagged for review inside WP1 or WP2.</p>
         </div>
         <label className="file-upload-button">
           <input
@@ -387,25 +406,25 @@ export function SourceDocumentIntake({ session, onSessionChange, onStepChange }:
       <div className="wp1-summary-grid intake-summary-grid">
         <SummaryCard label="Uploaded / Parsed" value={items.length.toString()} />
         <SummaryCard label="Needs Review" tone="orange" value={needsReview.toString()} />
-        <SummaryCard label="Accepted for WP1" tone="green" value={acceptedWp1.length.toString()} />
-        <SummaryCard label="Accepted for WP2" tone="blue" value={acceptedWp2.length.toString()} />
+        <SummaryCard label="Ready for WP1" tone="green" value={importableWp1.length.toString()} />
+        <SummaryCard label="Ready for WP2" tone="blue" value={importableWp2.length.toString()} />
         <SummaryCard label="Imported" tone="teal" value={items.filter((item) => item.status === 'Imported').length.toString()} />
         <SummaryCard label="Ignored" tone="red" value={items.filter((item) => item.status === 'Ignored').length.toString()} />
       </div>
 
       <WorkpaperFrame
         period={session.client.period}
-        subtitle={`${session.client.entityName} - review detected source documents before they enter the workpapers`}
+        subtitle={`${session.client.entityName} - choose WP1 or WP2, then import. Details can be cleaned up later.`}
         title="Source Document Intake"
         footer={
           <>
             <div className="metric">
               <span>WP1 Ready</span>
-              <strong>{acceptedWp1.length}</strong>
+              <strong>{importableWp1.length}</strong>
             </div>
             <div className="metric">
               <span>WP2 Ready</span>
-              <strong>{acceptedWp2.length}</strong>
+              <strong>{importableWp2.length}</strong>
             </div>
             <button
               className="secondary-button"
@@ -417,11 +436,11 @@ export function SourceDocumentIntake({ session, onSessionChange, onStepChange }:
             </button>
             <button
               className="primary-button"
-              disabled={!acceptedWp1.length && !acceptedWp2.length}
-              onClick={importAccepted}
+              disabled={!importableItems.length}
+              onClick={importReviewRows}
               type="button"
             >
-              Import Accepted
+              Import Review Rows
             </button>
           </>
         }
@@ -569,7 +588,6 @@ export function SourceDocumentIntake({ session, onSessionChange, onStepChange }:
                           <>
                             <button
                               className="text-button split-action"
-                              disabled={!canAccept(item)}
                               onClick={() =>
                                 updateItem(item.id, {
                                   status: item.target === 'Ignore' ? 'Ignored' : 'Accepted',
@@ -577,7 +595,7 @@ export function SourceDocumentIntake({ session, onSessionChange, onStepChange }:
                               }
                               type="button"
                             >
-                              {item.target === 'Ignore' ? 'Ignore' : 'Accept'}
+                              {item.target === 'Ignore' ? 'Ignore' : 'Mark Ready'}
                             </button>
                             <button
                               className="text-button"
@@ -605,8 +623,8 @@ export function SourceDocumentIntake({ session, onSessionChange, onStepChange }:
 
       <section className="intake-next-panel">
         <div>
-          <strong>After importing accepted rows</strong>
-          <span>Open WP1 to resolve GL, split, and reclassify items. Open WP2 after bank statement rows are imported.</span>
+          <strong>After importing review rows</strong>
+          <span>Open WP1 to fix GL, amount, split, and reclassify items. Open WP2 to review bank rows and matches.</span>
         </div>
         <div className="intake-next-actions">
           <button className="secondary-button" onClick={() => onStepChange('wp1')} type="button">
