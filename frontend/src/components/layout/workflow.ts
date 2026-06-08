@@ -12,9 +12,9 @@ export const workflowSteps: WorkflowStep[] = [
   {
     id: 'collection',
     number: '01',
-    title: 'Document Collection',
-    shortTitle: 'Collection',
-    eyebrow: 'Before tool starts',
+    title: 'Source Document Intake',
+    shortTitle: 'Intake',
+    eyebrow: 'Upload docs',
   },
   {
     id: 'wp1',

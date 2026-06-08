@@ -1,35 +1,25 @@
 import { useMemo, useState } from 'react'
-import type { ComponentType } from 'react'
 import './App.css'
 import { DemoControls } from './components/demo/DemoControls'
 import { AppShell } from './components/layout/AppShell'
 import { workflowSteps } from './components/layout/workflow'
-import { DocumentCollection } from './components/steps/StepViews'
 import { AdjustingEntries } from './components/steps/AdjustingEntries'
 import { ExcelDownload } from './components/steps/ExcelDownload'
 import { HandoverNote } from './components/steps/HandoverNote'
 import { JournalVoucher } from './components/steps/JournalVoucher'
 import { ReviewValidation } from './components/steps/ReviewValidation'
+import { SourceDocumentIntake } from './components/steps/SourceDocumentIntake'
 import { WP1DocumentLedger } from './components/steps/WP1DocumentLedger'
 import { WP2BankVerification } from './components/steps/WP2BankVerification'
 import { sampleSession } from './data/sampleSession'
 import { generateJournalLines } from './state/journalBuilder'
 import type { SampleSession, WorkflowStepId } from './types/session'
 
-type ReadOnlyStepId = Exclude<
-  WorkflowStepId,
-  'wp1' | 'wp2' | 'adjusting' | 'review' | 'journal' | 'handover' | 'download'
->
-
-const stepComponents: Record<ReadOnlyStepId, ComponentType<{ session: SampleSession }>> = {
-  collection: DocumentCollection,
-}
-
 const pageGuidance: Record<WorkflowStepId, { helper: string; nextAction: string; steps: string[] }> = {
   collection: {
-    helper: 'Collect the month source documents first. Keep the bank statement ready, but use it after WP1.',
-    nextAction: 'Next action: open WP1 and start posting the source documents.',
-    steps: ['Check that source documents are available.', 'Keep the bank statement aside.', 'Move to WP1 when ready.'],
+    helper: 'Upload source documents first, review what the app detects, then import accepted rows into WP1 or WP2.',
+    nextAction: 'Next action: add BK test documents and accept the rows that should flow downstream.',
+    steps: ['Upload source documents or CSV exports.', 'Correct document type, amount, and target workpaper.', 'Import accepted rows into WP1 or WP2.'],
   },
   wp1: {
     helper: 'Post each source document into the ledger. Complete splits, reclassifications, and missing GL accounts before moving to bank verification.',
@@ -83,17 +73,6 @@ function App() {
   const previousStep = activeIndex > 0 ? workflowSteps[activeIndex - 1] : undefined
   const nextStep = activeIndex >= 0 && activeIndex < workflowSteps.length - 1 ? workflowSteps[activeIndex + 1] : undefined
   const journalVoucherNeedsReview = session.journalVoucherFinalised && !snapshotMatchesCurrent(session)
-  const ActiveStep =
-    activeStep === 'wp1' ||
-    activeStep === 'wp2' ||
-    activeStep === 'adjusting' ||
-    activeStep === 'review' ||
-    activeStep === 'journal' ||
-    activeStep === 'handover' ||
-    activeStep === 'download'
-      ? null
-      : stepComponents[activeStep]
-
   return (
     <AppShell activeStep={activeStep} onStepChange={setActiveStep} session={session}>
       <div className="view-heading">
@@ -137,7 +116,13 @@ function App() {
         onSessionChange={setSession}
         onStepChange={setActiveStep}
       />
-      {activeStep === 'wp1' ? (
+      {activeStep === 'collection' ? (
+        <SourceDocumentIntake
+          onSessionChange={setSession}
+          onStepChange={setActiveStep}
+          session={session}
+        />
+      ) : activeStep === 'wp1' ? (
         <WP1DocumentLedger
           onSessionChange={setSession}
           onStepChange={setActiveStep}
@@ -163,8 +148,6 @@ function App() {
         <HandoverNote onSessionChange={setSession} session={session} />
       ) : activeStep === 'download' ? (
         <ExcelDownload session={session} />
-      ) : ActiveStep ? (
-        <ActiveStep session={session} />
       ) : null}
     </AppShell>
   )

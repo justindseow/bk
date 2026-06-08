@@ -20,6 +20,12 @@ export type DocumentType =
   | 'Merchant Statement'
   | 'Utility Bill'
 
+export type IntakeDocumentType = DocumentType | 'Bank Statement' | 'Unknown'
+
+export type IntakeStatus = 'Needs Review' | 'Accepted' | 'Imported' | 'Ignored'
+
+export type IntakeTarget = 'WP1' | 'WP2' | 'Ignore'
+
 export type DocumentStatus =
   | 'Posted'
   | 'Needs Split'
@@ -67,6 +73,27 @@ export interface SourceDocument {
   splitType?: SplitType
   reclassifyType?: ReclassifyType
   note?: string
+}
+
+export interface SourceIntakeItem {
+  id: string
+  fileName: string
+  fileType: string
+  fileSize: number
+  uploadedAt: string
+  detectedType: IntakeDocumentType
+  confidence: 'High' | 'Medium' | 'Low'
+  status: IntakeStatus
+  target: IntakeTarget
+  date: string
+  reference: string
+  party: string
+  amount: number
+  moneyIn: number
+  moneyOut: number
+  suggestedGlAccount: string
+  notes: string
+  rawPreview?: string
 }
 
 export interface AccountOption {
@@ -247,6 +274,7 @@ export interface SampleSession {
   journalVoucherFinalised: boolean
   journalVoucherFinalisedAt?: string
   finalisedJournalLinesSnapshot: JournalLine[]
+  sourceIntakeItems: SourceIntakeItem[]
   documents: SourceDocument[]
   splitDecisions: SplitDecision[]
   reclassifyDecisions: ReclassifyDecision[]

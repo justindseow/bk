@@ -19,6 +19,7 @@ export function createBlankBkTestSession(current: SampleSession = sampleSession)
     journalVoucherFinalised: false,
     journalVoucherFinalisedAt: undefined,
     finalisedJournalLinesSnapshot: [],
+    sourceIntakeItems: [],
     documents: [],
     splitDecisions: [],
     reclassifyDecisions: [],

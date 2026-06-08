@@ -10,6 +10,7 @@ export const sampleSession: SampleSession = {
   journalVoucherReady: false,
   journalVoucherFinalised: false,
   finalisedJournalLinesSnapshot: [],
+  sourceIntakeItems: [],
   documents: [
     {
       id: '01',

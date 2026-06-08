@@ -38,7 +38,7 @@ export function AppShell({ activeStep, session, children, onStepChange }: AppShe
 
         <div className="sidebar-note">
           <strong>Session only</strong>
-          <span>No database, no OCR, no AR/AP in this phase.</span>
+          <span>Uploads stay in browser session for BK testing.</span>
         </div>
       </aside>
 
