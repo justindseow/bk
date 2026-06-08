@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { accountsForDocumentType, findAccount, formatAccount } from '../../data/accounts'
 import type {
@@ -10,6 +11,7 @@ import type {
   SourceIntakeItem,
   WorkflowStepId,
 } from '../../types/session'
+import { apiBaseUrl } from '../../utils/api'
 import { WorkpaperFrame } from '../layout/WorkpaperFrame'
 
 interface SourceDocumentIntakeProps {
@@ -24,6 +26,10 @@ type DetectionResult = Pick<SourceIntakeItem, 'detectedType' | 'confidence' | 't
   evidence: string[]
   warnings: string[]
   suggestedGlAccount: string
+}
+
+type ExtractResponse = {
+  items?: SourceIntakeItem[]
 }
 
 const documentTypes: DocumentType[] = [
@@ -353,6 +359,22 @@ const buildIntakeItemsForFile = async (file: File): Promise<SourceIntakeItem[]> 
   ]
 }
 
+const extractFilesWithBackend = async (files: File[]): Promise<SourceIntakeItem[]> => {
+  const formData = new FormData()
+  files.forEach((file) => formData.append('files', file))
+
+  const response = await fetch(`${apiBaseUrl()}/intake/extract`, {
+    method: 'POST',
+    body: formData,
+  })
+
+  if (!response.ok) throw new Error('extract-failed')
+
+  const payload = (await response.json()) as ExtractResponse
+  if (!Array.isArray(payload.items)) throw new Error('extract-invalid')
+  return payload.items
+}
+
 const nextDocumentId = (documents: SourceDocument[], offset: number) => {
   const maxNumber = documents.reduce((max, document) => {
     const numeric = Number(document.id.replace(/\D/g, ''))
@@ -427,6 +449,9 @@ const bankRowFromIntake = (item: SourceIntakeItem, id: string, session: SampleSe
 const canImport = (item: SourceIntakeItem) => item.status !== 'Imported' && item.status !== 'Ignored' && item.target !== 'Ignore'
 
 export function SourceDocumentIntake({ session, onSessionChange, onStepChange }: SourceDocumentIntakeProps) {
+  const [extracting, setExtracting] = useState(false)
+  const [extractMessage, setExtractMessage] = useState<string | null>(null)
+  const [extractMessageType, setExtractMessageType] = useState<'ok' | 'warning'>('ok')
   const items = session.sourceIntakeItems
   const importableWp1 = items.filter((item) => canImport(item) && item.target === 'WP1')
   const importableWp2 = items.filter((item) => canImport(item) && item.target === 'WP2')
@@ -446,13 +471,31 @@ export function SourceDocumentIntake({ session, onSessionChange, onStepChange }:
   const handleFiles = async (fileList: FileList | null) => {
     const files = Array.from(fileList ?? [])
     if (!files.length) return
-    const batches = await Promise.all(files.map((file) => buildIntakeItemsForFile(file)))
-    const nextItems = batches.flat()
-    onSessionChange((current) => ({
-      ...current,
-      sourceIntakeItems: [...current.sourceIntakeItems, ...nextItems],
-      journalVoucherReady: false,
-    }))
+    setExtracting(true)
+    setExtractMessage(null)
+
+    try {
+      const nextItems = await extractFilesWithBackend(files)
+      onSessionChange((current) => ({
+        ...current,
+        sourceIntakeItems: [...current.sourceIntakeItems, ...nextItems],
+        journalVoucherReady: false,
+      }))
+      setExtractMessageType('ok')
+      setExtractMessage(`Server extractor read ${nextItems.length} row(s) from ${files.length} file(s).`)
+    } catch {
+      const batches = await Promise.all(files.map((file) => buildIntakeItemsForFile(file)))
+      const nextItems = batches.flat()
+      onSessionChange((current) => ({
+        ...current,
+        sourceIntakeItems: [...current.sourceIntakeItems, ...nextItems],
+        journalVoucherReady: false,
+      }))
+      setExtractMessageType('warning')
+      setExtractMessage('Extractor service was unavailable, so the browser fallback created review rows.')
+    } finally {
+      setExtracting(false)
+    }
   }
 
   const importReviewRows = () => {
@@ -487,10 +530,11 @@ export function SourceDocumentIntake({ session, onSessionChange, onStepChange }:
         <div className="intake-upload-copy">
           <span>Source Document Intake</span>
           <strong>Upload BK test documents before WP1 and WP2.</strong>
-          <p>Upload first, then send rows downstream. Missing fields are flagged for review inside WP1 or WP2.</p>
+          <p>Excel, CSV, TXT, and text PDFs are extracted by the parser. Scanned PDFs/images become review rows.</p>
         </div>
         <label className="file-upload-button">
           <input
+            disabled={extracting}
             multiple
             onChange={(event) => {
               void handleFiles(event.target.files)
@@ -498,9 +542,13 @@ export function SourceDocumentIntake({ session, onSessionChange, onStepChange }:
             }}
             type="file"
           />
-          Add Source Docs
+          {extracting ? 'Extracting...' : 'Add Source Docs'}
         </label>
       </section>
+
+      {extractMessage ? (
+        <section className={`intake-parser-message ${extractMessageType}`}>{extractMessage}</section>
+      ) : null}
 
       <div className="wp1-summary-grid intake-summary-grid">
         <SummaryCard label="Uploaded / Parsed" value={items.length.toString()} />

@@ -19,6 +19,10 @@
       "destination": "/api/index.py"
     },
     {
+      "source": "/intake/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
       "source": "/feedback",
       "destination": "/api/index.py"
     },

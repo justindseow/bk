@@ -1,11 +1,12 @@
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.feedback import FeedbackEmailNotConfigured, feedback_email_configured, send_feedback_email
 from app.export_excel import build_excel_workbook, build_test_excel_workbook, export_filename
+from app.intake_extractor import extract_intake_items
 from app.models import ExportRequest, FeedbackRequest
 
 app = FastAPI(title="MacroByte BK Tool API")
@@ -59,6 +60,15 @@ def export_test_excel() -> StreamingResponse:
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="MacroByte_BK_XYZ_Co_Sdn_Bhd_Jan_2025.xlsx"'},
     )
+
+
+@app.post("/intake/extract")
+async def extract_source_documents(files: list[UploadFile] = File(...)) -> dict[str, object]:
+    items = []
+    for file in files:
+        data = await file.read()
+        items.extend(extract_intake_items(file.filename or "uploaded-file", file.content_type or "unknown", data))
+    return {"items": items}
 
 
 @app.post("/feedback")

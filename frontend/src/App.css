@@ -913,6 +913,26 @@
   display: none;
 }
 
+.intake-parser-message {
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  padding: 9px 11px;
+}
+
+.intake-parser-message.ok {
+  background: var(--green-light);
+  border: 1px solid #86efac;
+  color: var(--green);
+}
+
+.intake-parser-message.warning {
+  background: var(--gold-light);
+  border: 1px solid #f59e0b;
+  color: var(--gold);
+}
+
 .paste-panel label,
 .manual-form-grid label {
   display: flex;
