@@ -1,0 +1,207 @@
+{
+  "client": "XYZ Co Sdn Bhd",
+  "lane": "auto",
+  "cases": [
+    {
+      "path": "test docs/3208756830_202602-February.pdf",
+      "expected_item_count": 493,
+      "expected_status_counts": {
+        "Accepted": 493
+      },
+      "expected_target_counts": {
+        "WP2": 493
+      },
+      "expected_type_counts": {
+        "Bank Statement": 493
+      },
+      "expected_first": {
+        "detectedType": "Bank Statement",
+        "target": "WP2",
+        "date": "01 Feb",
+        "reference": "6600987022",
+        "moneyIn": 1106.14,
+        "moneyOut": 0.0,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/PTS Food Distribution Sdn Bhd 20260203 PG26020256.pdf",
+      "expected_first": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "date": "03 Feb",
+        "reference": "PG26020256",
+        "amount": 1674.6,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/PTS Food Distribution Sdn Bhd 20260203 PL26020079.pdf",
+      "expected_first": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "date": "03 Feb",
+        "reference": "PL26020079",
+        "amount": 722.0,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/PTS Food Distribution Sdn Bhd 20260204 PF26020519.pdf",
+      "expected_first": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "date": "04 Feb",
+        "reference": "PF26020519",
+        "amount": 399.0,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/AYT SUPPLY_00432345.pdf",
+      "expected_first": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "date": "16 Feb",
+        "reference": "AYT-SUPPLY-00432345",
+        "amount": 564.61,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/TRI APEX_2026021518.pdf",
+      "expected_first": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "date": "26 Feb",
+        "reference": "TRI-APEX-2026021518",
+        "amount": 360.0,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/Sales by Category_2026-02-01-2026-02-28 (Bar).csv",
+      "expected_item_count": 98,
+      "expected_status_counts": {
+        "Accepted": 98
+      },
+      "expected_target_counts": {
+        "WP1": 98
+      },
+      "expected_type_counts": {
+        "Sales Summary": 98
+      },
+      "expected_first": {
+        "detectedType": "Sales Summary",
+        "target": "WP1",
+        "date": "01 Feb",
+        "reference": "SALES-BY-CATEGORY",
+        "amount": 516.7,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/Sales by Category_2026-02-01-2026-02-28 (CNY).csv",
+      "expected_item_count": 14,
+      "expected_status_counts": {
+        "Accepted": 14
+      },
+      "expected_target_counts": {
+        "WP1": 14
+      },
+      "expected_type_counts": {
+        "Sales Summary": 14
+      },
+      "expected_first": {
+        "detectedType": "Sales Summary",
+        "target": "WP1",
+        "date": "06 Feb",
+        "reference": "SALES-BY-CATEGORY",
+        "amount": 58.0,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/Sales by Category_2026-02-01-2026-02-28 (Kitchen).csv",
+      "expected_item_count": 99,
+      "expected_status_counts": {
+        "Accepted": 99
+      },
+      "expected_target_counts": {
+        "WP1": 99
+      },
+      "expected_type_counts": {
+        "Sales Summary": 99
+      },
+      "expected_first": {
+        "detectedType": "Sales Summary",
+        "target": "WP1",
+        "date": "01 Feb",
+        "reference": "SALES-BY-CATEGORY",
+        "amount": 1208.0,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/PHOTO-2026-02-14-07-39-26.jpg",
+      "expected_first": {
+        "detectedType": "Receipt",
+        "target": "WP1",
+        "date": "06 Feb",
+        "reference": "PHOTO-2026-02-14-07-39-26",
+        "amount": 0.0,
+        "status": "Needs Review"
+      }
+    },
+    {
+      "path": "test docs/PHANG YING LENG_32218.pdf",
+      "expected_first": {
+        "detectedType": "Unknown",
+        "target": "WP1",
+        "reference": "RECEIVED",
+        "amount": 0.0,
+        "status": "Needs Review"
+      }
+    },
+    {
+      "path": "test docs/ADELLE SERV_0347.pdf",
+      "expected_first": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "reference": "ADELLE-SERV-0347",
+        "amount": 2.76,
+        "status": "Needs Review"
+      }
+    },
+    {
+      "path": "test docs/ANTHONY_871116.pdf",
+      "expected_first": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "reference": "ANTHONY-871116",
+        "amount": 0.0,
+        "status": "Needs Review"
+      }
+    },
+    {
+      "path": "test docs/DANKOFF COF_IN600134116.pdf",
+      "expected_first": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "reference": "DANKOFF-COF-IN600134116",
+        "amount": 380.0,
+        "status": "Needs Review"
+      }
+    },
+    {
+      "path": "test docs/ONE INDULGENCE_288129.pdf",
+      "expected_first": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "reference": "ONE-INDULGENCE-288129",
+        "amount": 0.0,
+        "status": "Needs Review"
+      }
+    }
+  ]
+}

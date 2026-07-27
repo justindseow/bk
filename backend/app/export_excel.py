@@ -9,8 +9,6 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-BANK_CLOSING_BALANCE = 48320
-BOOK_BALANCE_BEFORE_BANK_ONLY = 42595
 CASH_ACCOUNT = {"code": "1020", "name": "CIMB Current Account"}
 
 NAVY = "1F2D3D"
@@ -306,6 +304,8 @@ def validate_session(session: dict[str, Any], journal_lines: list[dict[str, Any]
 
 
 def calculate_reconciliation(session: dict[str, Any]) -> dict[str, float]:
+    bank_closing = session.get("wp2BankClosingBalance")
+    book_balance = session.get("wp2BookBalanceBeforeBankOnly")
     outstanding = sum(
         number(item.get("amount"))
         for item in session.get("timingItems", [])
@@ -321,17 +321,19 @@ def calculate_reconciliation(session: dict[str, Any]) -> dict[str, float]:
         row = find_by(session.get("bankRows", []), "id", entry.get("bankRowId"))
         if row:
             bank_only += number(row.get("amount"))
-    adjusted_bank = BANK_CLOSING_BALANCE - outstanding + deposits
-    adjusted_book = BOOK_BALANCE_BEFORE_BANK_ONLY + bank_only
+    adjusted_bank = number(bank_closing) - outstanding + deposits if bank_closing is not None else 0.0
+    adjusted_book = number(book_balance) + bank_only if book_balance is not None else 0.0
     return {
-        "bank_closing": BANK_CLOSING_BALANCE,
+        "bank_closing": number(bank_closing) if bank_closing is not None else None,
         "outstanding": outstanding,
         "deposits": deposits,
-        "adjusted_bank": adjusted_bank,
-        "book_balance": BOOK_BALANCE_BEFORE_BANK_ONLY,
+        "adjusted_bank": adjusted_bank if bank_closing is not None else None,
+        "book_balance": number(book_balance) if book_balance is not None else None,
         "bank_only": bank_only,
-        "adjusted_book": adjusted_book,
-        "difference": round(adjusted_bank - adjusted_book, 2),
+        "adjusted_book": adjusted_book if book_balance is not None else None,
+        "difference": round(adjusted_bank - adjusted_book, 2)
+        if bank_closing is not None and book_balance is not None
+        else None,
     }
 
 

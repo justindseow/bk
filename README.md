@@ -10,10 +10,11 @@ This is not the old OCR bookkeeping tool. The app is session-based: the user ope
 - FastAPI backend
 - Health check endpoint
 - Stateless Excel workbook export with openpyxl
+- Staged intake extraction pipeline with deterministic parsing and optional AI vision
 - Shared sample session data for XYZ Co Sdn Bhd, January 2025
 - No database
 - No AR/AP
-- No OCR
+- No server-side client persistence
 
 ## Workflow Views
 
@@ -68,6 +69,12 @@ Health check:
 GET http://127.0.0.1:8000/health
 ```
 
+Source intake extraction:
+
+```text
+POST http://127.0.0.1:8000/intake/extract
+```
+
 Feedback email:
 
 ```text
@@ -81,6 +88,45 @@ Excel export:
 ```text
 POST http://127.0.0.1:8000/export/excel
 ```
+
+## AI Vision Intake
+
+The backend now uses a staged intake pipeline:
+
+- `xlsx`, `xlsm`, `csv`, `tsv`, and readable text files use deterministic parsing first.
+- PDFs and images can use AI vision when configured.
+- The extractor returns `Accepted` rows for high-confidence results and `Needs Review` only for weaker outputs.
+
+Optional backend environment variables for AI-powered ingestion:
+
+```text
+AI_PROVIDER=openai
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_BASE_URL=
+OPENAI_VISION_ENABLED=true
+OPENAI_VISION_MODEL=gpt-4o
+OPENAI_SMART_CLASSIFIER_ENABLED=true
+OPENAI_CLASSIFIER_MODEL=gpt-4o-mini
+OPENROUTER_API_KEY=your-openrouter-api-key
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_MODEL=openai/gpt-4o-mini
+OPENROUTER_VISION_MODEL=openai/gpt-4o
+OPENROUTER_HTTP_REFERER=https://your-frontend-domain.example
+OPENROUTER_APP_TITLE=MacroByte BK Tool
+```
+
+With a live AI provider key, the backend can:
+
+- use AI vision for PDFs and images
+- use a lightweight AI sales classifier for revenue-side CSV/XLS/text files when `4100 - Sales Revenue` versus `4120 - F&B Revenue` is ambiguous
+
+Provider notes:
+
+- `AI_PROVIDER=openai` uses `OPENAI_API_KEY`
+- `AI_PROVIDER=openrouter` uses `OPENROUTER_API_KEY`
+- the backend health endpoint reports whether AI vision and the smart classifier are actually configured at runtime
+
+Without a live provider key, the extractor falls back to deterministic parsing and readable PDF text extraction only.
 
 ## Exporting Excel
 
@@ -123,6 +169,7 @@ The backend routes are served by Vercel Python Functions:
 GET /health
 POST /export/excel
 GET /export/test-excel
+POST /intake/extract
 POST /feedback
 ```
 
@@ -149,6 +196,11 @@ SMTP_USE_TLS=true
 SMTP_USERNAME=your-smtp-username
 SMTP_PASSWORD=your-smtp-password-or-app-password
 SMTP_FROM_EMAIL=your-email@example.com
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_VISION_ENABLED=true
+OPENAI_VISION_MODEL=gpt-4o
+OPENAI_SMART_CLASSIFIER_ENABLED=true
+OPENAI_CLASSIFIER_MODEL=gpt-4o-mini
 ```
 
 For Gmail or Microsoft accounts, use an app password or SMTP credential created for this purpose. Do not put email passwords in the frontend.
@@ -183,7 +235,15 @@ Demo resets:
 
 Use `Demo / QA Controls` and choose `Use Your Own Test Data` when the bookkeeper wants to test the workflow with sanitised real examples.
 
-Important: use sanitised sample data first. Do not upload or paste confidential client files unless authorised. This mode is still manual entry only: there is no OCR, PDF auto-reading, or AI extraction.
+Important: use sanitised sample data first. Do not upload or paste confidential client files unless authorised. AI vision for PDFs and images is optional and only runs when the backend host is configured with an OpenAI API key.
+
+Pilot monitoring:
+
+- The frontend can optionally use OpenReplay session replay plus custom events for BK pilot observation.
+- Set `VITE_OPENREPLAY_PROJECT_KEY` to enable tracking.
+- Optionally set `VITE_OPENREPLAY_INGEST_POINT` for a custom OpenReplay ingest endpoint.
+- Uploaded-source review areas are masked in replay where practical, and network payload capture is disabled by default.
+- The app tracks high-signal events such as step changes, uploads, duplicates skipped, intake review actions, raw source opens, and possible stuck states.
 
 Manual WP1 document entry:
 
@@ -225,16 +285,18 @@ The `Download WP1 Template` and `Download WP2 Template` buttons create CSV templ
 - CORS issue: use `127.0.0.1` for both frontend and backend, or confirm the frontend is running on port 5173 or 5174.
 - Shareable link cannot export or submit feedback: confirm `VITE_API_BASE_URL` points to the deployed backend, and `FRONTEND_ORIGINS` includes the deployed frontend URL.
 - Feedback email not sent: confirm all `SMTP_*` values and `FEEDBACK_TO_EMAIL` are set in the backend host.
+- AI vision did not run: confirm the selected provider key is set (`OPENAI_API_KEY` or `OPENROUTER_API_KEY`), `OPENAI_VISION_ENABLED=true`, and the backend dependencies are installed.
 - Port already in use: Vite may move from 5173 to 5174 automatically. For the backend, choose another port and update the frontend export URL if needed.
 - PowerShell npm policy issue: use `npm.cmd` instead of `npm`.
 
 ## Known Limitations
 
 - AR/AP workflows are intentionally not included yet.
-- OCR, PDF auto-reading, and document extraction are intentionally not included.
+- AI vision is optional; without it, scanned PDFs and image-heavy documents still fall back to review.
 - There is no database and no server-side client data persistence.
 - The current app is designed for one browser session, one client, and one monthly period at a time.
 - Excel export requires the FastAPI backend to be running.
+- Duplicate upload detection is session-based and currently compares uploaded files by local fingerprint before extraction.
 
 ## Persistence Rule
 

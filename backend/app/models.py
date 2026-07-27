@@ -22,3 +22,15 @@ class FeedbackRequest(BaseModel):
     period: str = Field(default="", max_length=80)
     journal_voucher_finalised: bool = False
     critical_issues: int = 0
+
+
+class IntakeExtractJsonFile(BaseModel):
+    file_name: str = Field(..., min_length=1, max_length=260)
+    content_type: str = Field(default="application/octet-stream", max_length=120)
+    data_base64: str = Field(..., min_length=1)
+
+
+class IntakeExtractJsonRequest(BaseModel):
+    files: list[IntakeExtractJsonFile]
+    upload_lane: str = Field(default="auto", max_length=40)
+    client_entity_name: str = Field(default="", max_length=160)

@@ -10,6 +10,9 @@ export const sampleSession: SampleSession = {
   journalVoucherReady: false,
   journalVoucherFinalised: false,
   finalisedJournalLinesSnapshot: [],
+  wp2BankClosingBalance: 48320,
+  wp2BookBalanceBeforeBankOnly: 42595,
+  wp2VerifiedAt: undefined,
   sourceIntakeItems: [],
   documents: [
     {

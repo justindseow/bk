@@ -41,7 +41,7 @@ export function DocumentCollection({ session }: StepProps) {
     >
       <div className="collection-grid">
         {[
-          'Sales invoices and merchant statements',
+          'Sales invoices, sales summaries, and merchant statements',
           'Purchase invoices and payment vouchers',
           'Receipts, utilities, payroll support',
           'Bank statement for verification step',

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { DemoControls } from './components/demo/DemoControls'
 import { AppShell } from './components/layout/AppShell'
@@ -11,9 +11,10 @@ import { ReviewValidation } from './components/steps/ReviewValidation'
 import { SourceDocumentIntake } from './components/steps/SourceDocumentIntake'
 import { WP1DocumentLedger } from './components/steps/WP1DocumentLedger'
 import { WP2BankVerification } from './components/steps/WP2BankVerification'
-import { sampleSession } from './data/sampleSession'
+import { createBlankBkTestSession } from './state/demoSessions'
 import { generateJournalLines } from './state/journalBuilder'
 import type { SampleSession, WorkflowStepId } from './types/session'
+import { telemetryEvent, telemetryIssue, telemetryMetadata } from './utils/telemetry'
 
 const pageGuidance: Record<WorkflowStepId, { helper: string; nextAction: string; steps: string[] }> = {
   collection: {
@@ -27,9 +28,9 @@ const pageGuidance: Record<WorkflowStepId, { helper: string; nextAction: string;
     steps: ['Add or paste document rows.', 'Fix any Split, Reclassify, or Select GL rows.', 'Move to WP2 after document rows are clean.'],
   },
   wp2: {
-    helper: 'Verify bank movements against the WP1 documents. Add bank-only entries only where no source document exists.',
-    nextAction: 'Next action: resolve Match Multiple, New, and Needs Review bank rows.',
-    steps: ['Add or paste bank statement rows.', 'Match bank rows to WP1 documents.', 'Record bank-only or timing items where needed.'],
+    helper: 'Verify imported bank movements against the WP1 documents, then confirm the statement and book balances before signing off WP2.',
+    nextAction: 'Next action: resolve Match Multiple, New, and Needs Review bank rows, then confirm the two balances.',
+    steps: ['Review the bank rows already imported from Intake.', 'Match bank rows to WP1 documents or record Bank+ / timing items.', 'Confirm the closing balance and book balance before verifying WP2.'],
   },
   adjusting: {
     helper: 'Post month-end entries that do not have a bank movement, such as reversals, accruals, and depreciation.',
@@ -63,7 +64,8 @@ const snapshotMatchesCurrent = (session: SampleSession) =>
 
 function App() {
   const [activeStep, setActiveStep] = useState<WorkflowStepId>('collection')
-  const [session, setSession] = useState<SampleSession>(sampleSession)
+  const [session, setSession] = useState<SampleSession>(() => createBlankBkTestSession())
+  const [wp1FocusDocumentId, setWp1FocusDocumentId] = useState<string | null>(null)
   const activeMeta = useMemo(
     () => workflowSteps.find((step) => step.id === activeStep) ?? workflowSteps[0],
     [activeStep],
@@ -73,8 +75,48 @@ function App() {
   const previousStep = activeIndex > 0 ? workflowSteps[activeIndex - 1] : undefined
   const nextStep = activeIndex >= 0 && activeIndex < workflowSteps.length - 1 ? workflowSteps[activeIndex + 1] : undefined
   const journalVoucherNeedsReview = session.journalVoucherFinalised && !snapshotMatchesCurrent(session)
+
+  useEffect(() => {
+    telemetryMetadata('entity_name', session.client.entityName)
+    telemetryMetadata('period', session.client.period)
+  }, [session.client.entityName, session.client.period])
+
+  useEffect(() => {
+    telemetryEvent('step_viewed', {
+      step: activeStep,
+      source_documents: session.documents.length,
+      bank_rows: session.bankRows.length,
+      intake_rows: session.sourceIntakeItems.length,
+    })
+
+    const timer = window.setTimeout(() => {
+      telemetryIssue('step_possible_stuck', {
+        step: activeStep,
+        review_rows: session.sourceIntakeItems.filter((item) => item.status === 'Needs Review').length,
+        documents: session.documents.length,
+        bank_rows: session.bankRows.length,
+      })
+    }, 5 * 60 * 1000)
+
+    return () => window.clearTimeout(timer)
+  }, [activeStep, session.bankRows.length, session.documents.length, session.sourceIntakeItems])
+
+  const changeStep = (nextStepId: WorkflowStepId) => {
+    if (nextStepId === activeStep) return
+    telemetryEvent('step_changed', {
+      from_step: activeStep,
+      to_step: nextStepId,
+    })
+    setActiveStep(nextStepId)
+  }
+
+  const navigateToWp1Document = (documentId: string) => {
+    setWp1FocusDocumentId(documentId)
+    changeStep('wp1')
+  }
+
   return (
-    <AppShell activeStep={activeStep} onStepChange={setActiveStep} session={session}>
+    <AppShell activeStep={activeStep} onStepChange={changeStep} session={session}>
       <div className="view-heading">
         <span>{activeMeta.number}</span>
         <div>
@@ -94,12 +136,12 @@ function App() {
         </ol>
         <div className="page-guidance-actions">
           {previousStep ? (
-            <button className="secondary-button" onClick={() => setActiveStep(previousStep.id)} type="button">
+            <button className="secondary-button" onClick={() => changeStep(previousStep.id)} type="button">
               Back: {previousStep.shortTitle}
             </button>
           ) : null}
           {nextStep ? (
-            <button className="primary-button" onClick={() => setActiveStep(nextStep.id)} type="button">
+            <button className="primary-button" onClick={() => changeStep(nextStep.id)} type="button">
               Next: {nextStep.shortTitle}
             </button>
           ) : null}
@@ -114,34 +156,36 @@ function App() {
       <DemoControls
         activeStep={activeStep}
         onSessionChange={setSession}
-        onStepChange={setActiveStep}
+        onStepChange={changeStep}
       />
       {activeStep === 'collection' ? (
         <SourceDocumentIntake
           onSessionChange={setSession}
-          onStepChange={setActiveStep}
+          onStepChange={changeStep}
           session={session}
         />
       ) : activeStep === 'wp1' ? (
         <WP1DocumentLedger
+          focusDocumentId={wp1FocusDocumentId}
+          onClearFocus={() => setWp1FocusDocumentId(null)}
           onSessionChange={setSession}
-          onStepChange={setActiveStep}
+          onStepChange={changeStep}
           session={session}
         />
       ) : activeStep === 'wp2' ? (
-        <WP2BankVerification onSessionChange={setSession} session={session} />
+        <WP2BankVerification onNavigateToDocument={navigateToWp1Document} onSessionChange={setSession} onStepChange={changeStep} session={session} />
       ) : activeStep === 'adjusting' ? (
         <AdjustingEntries onSessionChange={setSession} session={session} />
       ) : activeStep === 'review' ? (
         <ReviewValidation
           onSessionChange={setSession}
-          onStepChange={setActiveStep}
+          onStepChange={changeStep}
           session={session}
         />
       ) : activeStep === 'journal' ? (
         <JournalVoucher
           onSessionChange={setSession}
-          onStepChange={setActiveStep}
+          onStepChange={changeStep}
           session={session}
         />
       ) : activeStep === 'handover' ? (

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { accountOptions, accountsForDocumentType, findAccount, formatAccount } from '../../data/accounts'
 import { generateDraftJournalLinesFromWP1 } from '../../state/journalBuilder'
@@ -22,6 +22,8 @@ interface WP1DocumentLedgerProps {
   session: SampleSession
   onSessionChange: Dispatch<SetStateAction<SampleSession>>
   onStepChange: (step: 'wp2') => void
+  focusDocumentId?: string | null
+  onClearFocus?: () => void
 }
 
 type ModalState =
@@ -66,12 +68,14 @@ const reclassifyTypes: ReclassifyType[] = ['Asset purchase', 'Director transacti
 
 const documentTypes: DocumentType[] = [
   'Sales Invoice',
+  'Sales Summary',
   'Purchase Invoice',
   'Payment Voucher',
   'Receipt',
   'Payroll Summary',
   'Loan / HP Statement',
   'Merchant Statement',
+  'Merchant Discount Fee',
   'Utility Bill',
 ]
 
@@ -158,7 +162,7 @@ const defaultSplitLines = (document: SourceDocument, splitType: SplitType): Spli
 }
 
 const flowForDocumentType = (docType: DocumentType) =>
-  ['Sales Invoice', 'Receipt', 'Merchant Statement'].includes(docType) ? 'IN' : 'OUT'
+  ['Sales Invoice', 'Sales Summary', 'Receipt', 'Merchant Statement'].includes(docType) ? 'IN' : 'OUT'
 
 const nextDocumentId = (documents: SourceDocument[]) => {
   const maxNumber = documents.reduce((max, document) => {
@@ -210,8 +214,9 @@ const parseWp1Paste = (text: string): DocumentFormState[] =>
       note,
     }))
 
-export function WP1DocumentLedger({ session, onSessionChange, onStepChange }: WP1DocumentLedgerProps) {
+export function WP1DocumentLedger({ session, onSessionChange, onStepChange, focusDocumentId, onClearFocus }: WP1DocumentLedgerProps) {
   const [modal, setModal] = useState<ModalState>(null)
+  const focusRowRef = useRef<HTMLTableRowElement>(null)
   const [pasteText, setPasteText] = useState('')
   const [pastePreview, setPastePreview] = useState<DocumentFormState[]>([])
   const draftJournalLines = useMemo(() => generateDraftJournalLinesFromWP1(session), [session])
@@ -250,6 +255,14 @@ export function WP1DocumentLedger({ session, onSessionChange, onStepChange }: WP
       ),
     }))
   }
+
+  useEffect(() => {
+    if (focusDocumentId && focusRowRef.current) {
+      focusRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const timer = window.setTimeout(() => onClearFocus?.(), 3000)
+      return () => window.clearTimeout(timer)
+    }
+  }, [focusDocumentId, onClearFocus])
 
   const markAsPosted = (document: SourceDocument) => {
     if (document.status === 'Needs Split' || document.status === 'Reclassify') return
@@ -447,7 +460,11 @@ export function WP1DocumentLedger({ session, onSessionChange, onStepChange }: WP
                 const canMarkPosted =
                   document.status !== 'Needs Split' && document.status !== 'Reclassify' && document.status !== 'Split Done' && document.status !== 'Reclassified'
                 return (
-                  <tr className={`wp1-row status-row-${statusKey(document.status)}`} key={document.id}>
+                  <tr
+                    className={`wp1-row status-row-${statusKey(document.status)}${focusDocumentId === document.id ? ' wp1-row-focus' : ''}`}
+                    key={document.id}
+                    ref={focusDocumentId === document.id ? focusRowRef : undefined}
+                  >
                     <td className="muted">{document.id}</td>
                     <td>{document.date}</td>
                     <td className="mono">{document.docRef}</td>

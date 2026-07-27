@@ -2,3 +2,4 @@ fastapi
 openpyxl
 python-multipart
 pypdf
+pymupdf

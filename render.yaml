@@ -8,6 +8,16 @@ services:
     envVars:
       - key: FRONTEND_ORIGINS
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_VISION_ENABLED
+        value: "true"
+      - key: OPENAI_VISION_MODEL
+        value: "gpt-4o"
+      - key: OPENAI_SMART_CLASSIFIER_ENABLED
+        value: "true"
+      - key: OPENAI_CLASSIFIER_MODEL
+        value: "gpt-4o-mini"
       - key: FEEDBACK_TO_EMAIL
         sync: false
       - key: SMTP_HOST

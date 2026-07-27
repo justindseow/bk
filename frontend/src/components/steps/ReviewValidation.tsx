@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { buildValidationResults } from '../../state/validation'
 import type { ValidationIssue, ValidationSeverity } from '../../state/validation'
@@ -34,14 +34,12 @@ const stepLabel = (step: WorkflowStepId) => {
 }
 
 export function ReviewValidation({ session, onSessionChange, onStepChange }: ReviewValidationProps) {
-  const [runCount, setRunCount] = useState(1)
   const [lastRunAt, setLastRunAt] = useState('Checked automatically when this page opened.')
-  const validation = useMemo(() => buildValidationResults(session), [session, runCount])
+  const validation = buildValidationResults(session)
   const criticalIssues = validation.issues.filter((issue) => issue.severity === 'Critical')
   const warningIssues = validation.issues.filter((issue) => issue.severity === 'Warning')
 
   const runValidation = () => {
-    setRunCount((count) => count + 1)
     setLastRunAt(`Last checked at ${new Date().toLocaleTimeString('en-MY', {
       hour: '2-digit',
       minute: '2-digit',

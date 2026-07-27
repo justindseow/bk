@@ -2,21 +2,30 @@ import { useMemo, useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { findAccount } from '../../data/accounts'
 import { generateDraftJournalLinesFromBankEntries } from '../../state/journalBuilder'
+import { calculateWp2Reconciliation } from '../../state/validation'
 import type {
   AccountOption,
   BankOnlyEntry,
   BankRow,
+  BankStatus,
   SampleSession,
   SourceDocument,
   TimingItem,
   TimingItemType,
+  WorkflowStepId,
 } from '../../types/session'
 import { WorkpaperFrame } from '../layout/WorkpaperFrame'
 import { downloadCsv } from '../../utils/downloadCsv'
+import {
+  bankOnlySuggestionForRow,
+  suggestedDocumentsForBankRow,
+} from '../../utils/wp2Heuristics'
 
 interface WP2BankVerificationProps {
   session: SampleSession
   onSessionChange: Dispatch<SetStateAction<SampleSession>>
+  onNavigateToDocument: (documentId: string) => void
+  onStepChange: (step: WorkflowStepId) => void
 }
 
 type ModalState =
@@ -35,9 +44,6 @@ type BankRowFormState = {
   moneyOut: number
   notes: string
 }
-
-const BANK_CLOSING_BALANCE = 48320
-const BOOK_BALANCE_BEFORE_BANK_ONLY = 42595
 
 const bankOnlyAccountCodes = ['6370', '6200', '7100', '6390', '2110', '6600']
 
@@ -59,31 +65,6 @@ const statusKey = (status: string) =>
 
 const statusClass = (status: string) => `badge badge-${statusKey(status)}`
 
-const normalize = (value: string) =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-
-const dateDay = (date: string) => Number(date.slice(0, 2))
-
-const flowMatchesDirection = (document: SourceDocument, bankRow: BankRow) =>
-  (document.flow === 'IN' && bankRow.direction === 'CR') ||
-  (document.flow === 'OUT' && bankRow.direction === 'DR')
-
-const scoreDocumentMatch = (document: SourceDocument, bankRow: BankRow) => {
-  let score = 0
-  if (!flowMatchesDirection(document, bankRow)) return score
-  if (Math.abs(document.amount - bankRow.amount) < 0.01) score += 5
-  if (bankRow.reference && normalize(document.docRef) === normalize(bankRow.reference)) score += 6
-  if (Math.abs(dateDay(document.date) - dateDay(bankRow.date)) <= 3) score += 2
-
-  const docWords = new Set(normalize(`${document.party} ${document.docRef}`).split(' ').filter(Boolean))
-  const bankWords = normalize(`${bankRow.description} ${bankRow.reference}`).split(' ').filter(Boolean)
-  score += bankWords.filter((word) => docWords.has(word)).length
-  return score
-}
-
 const suggestedDocumentsForRow = (session: SampleSession, bankRow: BankRow) => {
   const explicit = bankRow.suggestedDocumentIds
     ?.map((id) => session.documents.find((document) => document.id === id))
@@ -91,11 +72,7 @@ const suggestedDocumentsForRow = (session: SampleSession, bankRow: BankRow) => {
 
   if (explicit?.length) return explicit
 
-  return session.documents
-    .map((document) => ({ document, score: scoreDocumentMatch(document, bankRow) }))
-    .filter((item) => item.score >= 5)
-    .sort((a, b) => b.score - a.score)
-    .map((item) => item.document)
+  return suggestedDocumentsForBankRow(session.documents, bankRow)
 }
 
 const documentLabel = (document: SourceDocument) => `${document.docRef} - ${document.party}`
@@ -156,47 +133,46 @@ const parseWp2Paste = (text: string): BankRowFormState[] =>
       notes,
     }))
 
-export function WP2BankVerification({ session, onSessionChange }: WP2BankVerificationProps) {
+export function WP2BankVerification({ session, onSessionChange, onNavigateToDocument, onStepChange }: WP2BankVerificationProps) {
   const [modal, setModal] = useState<ModalState>(null)
   const [pasteText, setPasteText] = useState('')
   const [pastePreview, setPastePreview] = useState<BankRowFormState[]>([])
+  const [rowFilter, setRowFilter] = useState<BankStatus | null>(null)
   const bankPlusLines = useMemo(() => generateDraftJournalLinesFromBankEntries(session), [session])
 
-  const reconciliation = useMemo(() => {
-    const outstandingCheques = session.timingItems
-      .filter((item) => item.timingType === 'Outstanding cheque')
-      .reduce((sum, item) => sum + item.amount, 0)
-    const depositsInTransit = session.timingItems
-      .filter((item) => item.timingType === 'Deposit in transit')
-      .reduce((sum, item) => sum + item.amount, 0)
-    const bankOnlyAdjustment = session.bankOnlyEntries.reduce((sum, entry) => {
-      const row = session.bankRows.find((bankRow) => bankRow.id === entry.bankRowId)
-      return row ? sum + row.amount : sum
-    }, 0)
-    const adjustedBank = BANK_CLOSING_BALANCE - outstandingCheques + depositsInTransit
-    const adjustedBook = BOOK_BALANCE_BEFORE_BANK_ONLY + bankOnlyAdjustment
-
-    return {
-      outstandingCheques,
-      depositsInTransit,
-      bankOnlyAdjustment,
-      adjustedBank,
-      adjustedBook,
-      difference: Number((adjustedBank - adjustedBook).toFixed(2)),
-    }
-  }, [session.bankOnlyEntries, session.bankRows, session.timingItems])
+  const reconciliation = useMemo(() => calculateWp2Reconciliation(session), [session])
 
   const summary = useMemo(
     () => ({
       rows: session.bankRows.length,
       matched: session.bankRows.filter((row) => row.status === 'Matched').length,
       matchMultiple: session.bankRows.filter((row) => row.status === 'Match Multiple').length,
+      proposedMatch: session.bankRows.filter((row) => row.status === 'Proposed Match').length,
       newRows: session.bankRows.filter((row) => row.status === 'New').length,
       timingItems: session.timingItems.length,
       needsReview: session.bankRows.filter((row) => row.status === 'Needs Review').length,
     }),
     [session.bankRows, session.timingItems.length],
   )
+  const filteredRows = rowFilter
+    ? session.bankRows.filter((row) => row.status === rowFilter)
+    : session.bankRows
+
+  const hasConfirmedBalances =
+    reconciliation.bankClosingBalance !== null && reconciliation.bookBalanceBeforeBankOnly !== null
+  const unresolvedRowCount = summary.needsReview + summary.newRows + summary.matchMultiple + summary.proposedMatch
+  const canVerifyWp2 =
+    session.bankRows.length > 0 &&
+    hasConfirmedBalances &&
+    unresolvedRowCount === 0 &&
+    reconciliation.difference !== null &&
+    Math.abs(reconciliation.difference) < 0.01
+
+  const markWp2Dirty = (current: SampleSession) => ({
+    ...current,
+    wp2VerifiedAt: undefined,
+    journalVoucherReady: false,
+  })
 
   const markSingleMatched = (bankRow: BankRow) => {
     const suggested = suggestedDocumentsForRow(session, bankRow)
@@ -204,7 +180,7 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
     if (!firstMatch || firstMatch.status === 'Pending Review') return
 
     onSessionChange((current) => ({
-      ...current,
+      ...markWp2Dirty(current),
       bankMatches: [
         ...current.bankMatches.filter((match) => match.bankRowId !== bankRow.id),
         {
@@ -230,12 +206,11 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
   const deleteBankRow = (bankRowId: string) => {
     if (!window.confirm('Delete this bank row from the current session?')) return
     onSessionChange((current) => ({
-      ...current,
+      ...markWp2Dirty(current),
       bankRows: current.bankRows.filter((row) => row.id !== bankRowId),
       bankMatches: current.bankMatches.filter((match) => match.bankRowId !== bankRowId),
       bankOnlyEntries: current.bankOnlyEntries.filter((entry) => entry.bankRowId !== bankRowId),
       timingItems: current.timingItems.filter((item) => item.bankRowId !== bankRowId),
-      journalVoucherReady: false,
     }))
   }
 
@@ -247,22 +222,31 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
         return bankRowFromForm(row, `B${String(current.bankRows.length + counter).padStart(3, '0')}`)
       })
       return {
-        ...current,
+        ...markWp2Dirty(current),
         bankRows: [...current.bankRows, ...rows],
-        journalVoucherReady: false,
       }
     })
     setPastePreview([])
     setPasteText('')
   }
 
+  const verifyWp2 = () => {
+    if (!canVerifyWp2) return
+    onSessionChange((current) => ({
+      ...current,
+      wp2VerifiedAt: new Date().toISOString(),
+      journalVoucherReady: false,
+    }))
+    onStepChange('adjusting')
+  }
+
   return (
     <>
       <section className="manual-entry-panel">
         <div className="manual-entry-copy">
-          <span>BK Test Session</span>
-          <strong>Add your WP2 bank statement rows here.</strong>
-          <p>Use Add Bank Row for one line, or paste copied bank statement rows and preview before importing.</p>
+          <span>WP2 Bank Review</span>
+          <strong>Review the bank rows imported from Intake first.</strong>
+          <p>Add or paste bank rows only when Intake missed something, or when BK needs to correct a statement line manually.</p>
         </div>
         <div className="manual-entry-actions">
           <button
@@ -288,6 +272,48 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
           >
             Preview Paste
           </button>
+        </div>
+      </section>
+
+      <section className="manual-entry-panel">
+        <div className="manual-entry-copy">
+          <span>Verification Setup</span>
+          <strong>Confirm the two balances before signing off WP2.</strong>
+          <p>Use the closing balance from the bank statement and the book balance before any WP2-only entries.</p>
+        </div>
+        <div className="manual-form-grid wp2-balance-grid">
+          <label>
+            <span>Bank statement closing balance</span>
+            <input
+              min="0"
+              step="0.01"
+              type="number"
+              value={session.wp2BankClosingBalance ?? ''}
+              onChange={(event) =>
+                onSessionChange((current) => ({
+                  ...markWp2Dirty(current),
+                  wp2BankClosingBalance:
+                    event.target.value === '' ? null : Number(event.target.value),
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>Book balance before WP2-only entries</span>
+            <input
+              min="0"
+              step="0.01"
+              type="number"
+              value={session.wp2BookBalanceBeforeBankOnly ?? ''}
+              onChange={(event) =>
+                onSessionChange((current) => ({
+                  ...markWp2Dirty(current),
+                  wp2BookBalanceBeforeBankOnly:
+                    event.target.value === '' ? null : Number(event.target.value),
+                }))
+              }
+            />
+          </label>
         </div>
       </section>
 
@@ -341,13 +367,74 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
       </section>
 
       <div className="wp1-summary-grid">
-        <SummaryCard label="Bank Rows" value={summary.rows.toString()} />
-        <SummaryCard label="Matched" tone="green" value={summary.matched.toString()} />
-        <SummaryCard label="Match Multiple" tone="blue" value={summary.matchMultiple.toString()} />
-        <SummaryCard label="New" tone="orange" value={summary.newRows.toString()} />
-        <SummaryCard label="Timing Items" tone="purple" value={summary.timingItems.toString()} />
-        <SummaryCard label="Needs Review" tone="red" value={summary.needsReview.toString()} />
+        <SummaryCard
+          isActive={rowFilter === null}
+          label="Bank Rows"
+          value={summary.rows.toString()}
+          onClick={() => setRowFilter(null)}
+        />
+        <SummaryCard
+          isActive={rowFilter === 'Matched'}
+          label="Matched"
+          tone="green"
+          value={summary.matched.toString()}
+          onClick={() => setRowFilter(rowFilter === 'Matched' ? null : 'Matched')}
+        />
+        <SummaryCard
+          isActive={rowFilter === 'Match Multiple'}
+          label="Match Multiple"
+          tone="blue"
+          value={summary.matchMultiple.toString()}
+          onClick={() => setRowFilter(rowFilter === 'Match Multiple' ? null : 'Match Multiple')}
+        />
+        <SummaryCard
+          isActive={rowFilter === 'Proposed Match'}
+          label="Proposed Match"
+          tone="teal"
+          value={summary.proposedMatch.toString()}
+          onClick={() => setRowFilter(rowFilter === 'Proposed Match' ? null : 'Proposed Match')}
+        />
+        <SummaryCard
+          isActive={rowFilter === 'New'}
+          label="New"
+          tone="orange"
+          value={summary.newRows.toString()}
+          onClick={() => setRowFilter(rowFilter === 'New' ? null : 'New')}
+        />
+        <SummaryCard
+          isActive={rowFilter === 'Outstanding / Timing Item'}
+          label="Timing Items"
+          tone="purple"
+          value={summary.timingItems.toString()}
+          onClick={() => setRowFilter(rowFilter === 'Outstanding / Timing Item' ? null : 'Outstanding / Timing Item')}
+        />
+        <SummaryCard
+          isActive={rowFilter === 'Needs Review'}
+          label="Needs Review"
+          tone="red"
+          value={summary.needsReview.toString()}
+          onClick={() => setRowFilter(rowFilter === 'Needs Review' ? null : 'Needs Review')}
+        />
       </div>
+
+      {session.wp2VerifiedAt ? (
+        <section className="intake-queue-callout ready">
+          <strong>WP2 is verified.</strong>
+          <p>Verified at {new Date(session.wp2VerifiedAt).toLocaleString('en-MY')}. Continue to Adjusting Entries unless the bank rows change again.</p>
+        </section>
+      ) : null}
+      {!hasConfirmedBalances && session.bankRows.length > 0 ? (
+        <section className="intake-queue-callout warning">
+          <strong>WP2 still needs the two balance inputs.</strong>
+          <p>Enter the statement closing balance and the book balance before the verification button can be trusted.</p>
+        </section>
+      ) : null}
+      {unresolvedRowCount > 0 ? (
+        <section className="intake-queue-callout warning">
+          <strong>Resolve the remaining bank exceptions before sign-off.</strong>
+          <p>{unresolvedRowCount} bank row{unresolvedRowCount === 1 ? '' : 's'} still need matching, Bank+, or timing-item handling.</p>
+        </section>
+      ) : null}
 
       <WorkpaperFrame
         period={session.client.period}
@@ -361,16 +448,38 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
             </div>
             <div className="metric">
               <span>Recon Difference</span>
-              <strong className={Math.abs(reconciliation.difference) < 0.01 ? 'metric-ok' : 'metric-alert'}>
-                RM {formatMoney(Math.abs(reconciliation.difference))}
+              <strong
+                className={
+                  hasConfirmedBalances && reconciliation.difference !== null && Math.abs(reconciliation.difference) < 0.01
+                    ? 'metric-ok'
+                    : 'metric-alert'
+                }
+              >
+                RM {formatMoney(Math.abs(reconciliation.difference ?? 0))}
               </strong>
             </div>
-            <button className="primary-button" disabled={Math.abs(reconciliation.difference) >= 0.01} type="button">
-              Verified
+            <button
+              className="primary-button"
+              disabled={!canVerifyWp2}
+              onClick={verifyWp2}
+              title={
+                canVerifyWp2
+                  ? 'Mark WP2 verified and continue to Adjusting Entries.'
+                  : 'WP2 needs resolved bank rows, confirmed balances, and RM 0.00 difference before sign-off.'
+              }
+              type="button"
+            >
+              {session.wp2VerifiedAt ? 'WP2 Verified' : 'Verify WP2'}
             </button>
           </>
         }
       >
+        {rowFilter ? (
+          <div className="wp2-filter-bar">
+            <span>Showing <strong>{filteredRows.length}</strong> of {summary.rows} rows — {rowFilter}</span>
+            <button className="text-button" onClick={() => setRowFilter(null)} type="button">Clear filter</button>
+          </div>
+        ) : null}
         <div className="table-scroll">
           <table className="data-table wp2-table">
             <thead>
@@ -387,18 +496,20 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
               </tr>
             </thead>
             <tbody>
-              {session.bankRows.map((row) => {
+              {filteredRows.map((row) => {
                 const suggested = suggestedDocumentsForRow(session, row)
                 const canTreatAsTiming =
                   row.matchedTo === 'Books only' ||
                   row.description.toLowerCase().includes('cheque') ||
                   row.description.toLowerCase().includes('deposit')
-                const suggestedText =
-                  row.status === 'New'
-                    ? 'No source document'
-                    : suggested.length
-                      ? suggested.map((document) => document.docRef).join(' + ')
-                      : row.matchedTo || 'Review required'
+                const bankOnlySuggestion = bankOnlySuggestionForRow(row)
+                const fallbackText =
+                  row.matchedTo ||
+                  (row.status === 'New'
+                    ? bankOnlySuggestion
+                      ? `Likely Bank+ - ${bankOnlySuggestion.accountLabel}`
+                      : 'No source document'
+                    : 'Review required')
                 return (
                   <tr className={`wp2-row status-row-${statusKey(row.status)}`} key={row.id}>
                     <td className="muted">{row.id}</td>
@@ -412,7 +523,25 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
                     <td className="right amount-out">
                       {amountOut(row) ? `(${formatMoney(amountOut(row))})` : '-'}
                     </td>
-                    <td className="mono">{suggestedText}</td>
+                    <td className="mono suggested-match-cell">
+                      {suggested.length ? (
+                        suggested.slice(0, 2).map((document, index) => (
+                          <span key={document.id}>
+                            {index > 0 ? ' + ' : ''}
+                            <button
+                              className="suggested-match-link"
+                              onClick={() => onNavigateToDocument(document.id)}
+                              title={`${document.docRef} — ${document.party} (RM ${formatMoney(document.amount)})`}
+                              type="button"
+                            >
+                              {document.party} — RM {formatMoney(document.amount)}
+                            </button>
+                          </span>
+                        ))
+                      ) : (
+                        fallbackText
+                      )}
+                    </td>
                     <td>
                       <span className={statusClass(row.status)}>{row.status}</span>
                     </td>
@@ -435,6 +564,25 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
                           >
                             New Entry
                           </button>
+                        ) : null}
+                        {row.status === 'Proposed Match' ? (
+                          <>
+                            <button
+                              className="text-button confirm-action"
+                              disabled={!suggested[0] || suggested[0].status === 'Pending Review'}
+                              onClick={() => markSingleMatched(row)}
+                              type="button"
+                            >
+                              Confirm Match
+                            </button>
+                            <button
+                              className="text-button split-action"
+                              onClick={() => setModal({ type: 'new-entry', bankRow: row })}
+                              type="button"
+                            >
+                              New Entry
+                            </button>
+                          </>
                         ) : null}
                         {row.status === 'Needs Review' ? (
                           <>
@@ -490,9 +638,8 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
           onClose={() => setModal(null)}
           onSave={(form) => {
             onSessionChange((current) => ({
-              ...current,
+              ...markWp2Dirty(current),
               bankRows: [...current.bankRows, bankRowFromForm(form, nextBankRowId(current.bankRows))],
-              journalVoucherReady: false,
             }))
             setModal(null)
           }}
@@ -505,13 +652,12 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
           onClose={() => setModal(null)}
           onSave={(form) => {
             onSessionChange((current) => ({
-              ...current,
+              ...markWp2Dirty(current),
               bankRows: current.bankRows.map((row) =>
                 row.id === modal.bankRow.id
                   ? { ...bankRowFromForm(form, row.id), status: row.status, matchedTo: row.matchedTo }
                   : row,
               ),
-              journalVoucherReady: false,
             }))
             setModal(null)
           }}
@@ -528,7 +674,7 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
               .map((id) => session.documents.find((document) => document.id === id))
               .filter((document): document is SourceDocument => Boolean(document))
             onSessionChange((current) => ({
-              ...current,
+              ...markWp2Dirty(current),
               bankMatches: [
                 ...current.bankMatches.filter((match) => match.bankRowId !== modal.bankRow.id),
                 {
@@ -561,7 +707,7 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
           onClose={() => setModal(null)}
           onConfirm={(entry) => {
             onSessionChange((current) => ({
-              ...current,
+              ...markWp2Dirty(current),
               bankOnlyEntries: [
                 ...current.bankOnlyEntries.filter((item) => item.bankRowId !== entry.bankRowId),
                 entry,
@@ -589,7 +735,7 @@ export function WP2BankVerification({ session, onSessionChange }: WP2BankVerific
           onClose={() => setModal(null)}
           onConfirm={(timingItem) => {
             onSessionChange((current) => ({
-              ...current,
+              ...markWp2Dirty(current),
               timingItems: [
                 ...current.timingItems.filter((item) => item.bankRowId !== timingItem.bankRowId),
                 timingItem,
@@ -617,13 +763,25 @@ function SummaryCard({
   label,
   value,
   tone = 'neutral',
+  onClick,
+  isActive,
 }: {
   label: string
   value: string
-  tone?: 'neutral' | 'green' | 'orange' | 'purple' | 'red' | 'blue'
+  tone?: 'neutral' | 'green' | 'orange' | 'purple' | 'red' | 'blue' | 'teal'
+  onClick?: () => void
+  isActive?: boolean
 }) {
+  const cls = [
+    'summary-card',
+    `tone-${tone}`,
+    onClick ? 'summary-card-button' : '',
+    isActive ? 'active' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
   return (
-    <article className={`summary-card tone-${tone}`}>
+    <article className={cls} tabIndex={onClick ? 0 : undefined} onClick={onClick}>
       <span>{label}</span>
       <strong>{value}</strong>
     </article>
@@ -718,34 +876,40 @@ function ReconciliationPanel({
   session,
 }: {
   reconciliation: {
+    bankClosingBalance: number | null
+    bookBalanceBeforeBankOnly: number | null
     outstandingCheques: number
     depositsInTransit: number
     bankOnlyAdjustment: number
-    adjustedBank: number
-    adjustedBook: number
-    difference: number
+    adjustedBank: number | null
+    adjustedBook: number | null
+    difference: number | null
   }
   session: SampleSession
 }) {
-  const isBalanced = Math.abs(reconciliation.difference) < 0.01
+  const isBalanced =
+    reconciliation.bankClosingBalance !== null &&
+    reconciliation.bookBalanceBeforeBankOnly !== null &&
+    reconciliation.difference !== null &&
+    Math.abs(reconciliation.difference) < 0.01
 
   return (
     <section className="wp2-recon-panel">
       <div className="recon-card">
         <h3>Bank Statement</h3>
-        <ReconLine label="Closing balance" value={BANK_CLOSING_BALANCE} />
+        <ReconLine label="Closing balance" value={reconciliation.bankClosingBalance} />
         <ReconLine isNegative label="Less: outstanding cheques" value={reconciliation.outstandingCheques} />
         <ReconLine label="Add: deposits in transit" value={reconciliation.depositsInTransit} />
         <ReconLine isTotal label="Adjusted bank balance" value={reconciliation.adjustedBank} />
       </div>
       <div className="recon-card">
         <h3>Book Balance</h3>
-        <ReconLine label="Before bank-only entries" value={BOOK_BALANCE_BEFORE_BANK_ONLY} />
+        <ReconLine label="Before bank-only entries" value={reconciliation.bookBalanceBeforeBankOnly} />
         <ReconLine label="Add / less: WP2 bank-only entries" value={reconciliation.bankOnlyAdjustment} />
         <ReconLine isTotal label="Adjusted book balance" value={reconciliation.adjustedBook} />
         <div className={isBalanced ? 'recon-difference ok' : 'recon-difference alert'}>
           <span>Difference</span>
-          <strong>RM {formatMoney(Math.abs(reconciliation.difference))}</strong>
+          <strong>{reconciliation.difference === null ? 'Not set' : `RM ${formatMoney(Math.abs(reconciliation.difference))}`}</strong>
         </div>
       </div>
       <div className="recon-card timing-card">
@@ -773,7 +937,7 @@ function ReconLine({
   isTotal = false,
 }: {
   label: string
-  value: number
+  value: number | null
   isNegative?: boolean
   isTotal?: boolean
 }) {
@@ -781,7 +945,7 @@ function ReconLine({
     <div className={isTotal ? 'recon-line total' : 'recon-line'}>
       <span>{label}</span>
       <strong className={isNegative && value ? 'amount-out' : ''}>
-        {isNegative && value ? `(${formatMoney(value)})` : formatMoney(value)}
+        {value === null ? 'Not set' : isNegative && value ? `(${formatMoney(value)})` : formatMoney(value)}
       </strong>
     </div>
   )
@@ -887,7 +1051,8 @@ function NewEntryModal({
   onClose: () => void
   onConfirm: (entry: BankOnlyEntry) => void
 }) {
-  const [selectedCode, setSelectedCode] = useState(existingEntry?.accountCode ?? '')
+  const suggestedBankOnly = bankOnlySuggestionForRow(bankRow)
+  const [selectedCode, setSelectedCode] = useState(existingEntry?.accountCode ?? suggestedBankOnly?.accountCode ?? '')
   const [description, setDescription] = useState(existingEntry?.description ?? bankRow.description)
   const selectedAccount = selectedCode ? findAccount(selectedCode) : undefined
   const canConfirm = Boolean(selectedAccount && description.trim())
@@ -905,7 +1070,7 @@ function NewEntryModal({
         </div>
         <div>
           <span>Reason</span>
-          <strong>No source document</strong>
+          <strong>{suggestedBankOnly?.reason || 'No source document'}</strong>
         </div>
       </div>
 

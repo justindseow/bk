@@ -12,12 +12,14 @@ export type FlowDirection = 'IN' | 'OUT'
 
 export type DocumentType =
   | 'Sales Invoice'
+  | 'Sales Summary'
   | 'Purchase Invoice'
   | 'Payment Voucher'
   | 'Receipt'
   | 'Payroll Summary'
   | 'Loan / HP Statement'
   | 'Merchant Statement'
+  | 'Merchant Discount Fee'
   | 'Utility Bill'
 
 export type IntakeDocumentType = DocumentType | 'Bank Statement' | 'Unknown'
@@ -43,6 +45,7 @@ export type EntryDirection = 'DR' | 'CR'
 export type BankStatus =
   | 'Matched'
   | 'Match Multiple'
+  | 'Proposed Match'
   | 'New'
   | 'Outstanding / Timing Item'
   | 'Needs Review'
@@ -80,6 +83,8 @@ export interface SourceIntakeItem {
   fileName: string
   fileType: string
   fileSize: number
+  uploadLaneHint?: 'auto' | 'purchases' | 'sales' | 'bank' | 'payments'
+  sourceFingerprint?: string
   uploadedAt: string
   detectedType: IntakeDocumentType
   confidence: 'High' | 'Medium' | 'Low'
@@ -96,6 +101,32 @@ export interface SourceIntakeItem {
   evidence?: string[]
   warnings?: string[]
   rawPreview?: string
+  extractionMethod?: string
+  overallConfidenceScore?: number
+  fieldConfidence?: Record<string, number>
+  fieldEvidence?: Record<string, string[]>
+  glSuggestions?: Array<{
+    account: string
+    confidence: number
+    reason: string
+  }>
+  rawSource?: {
+    fileName: string
+    headerRowNumber?: number
+    rowNumber?: number
+    headers: string[]
+    cells: string[]
+    contextRows?: Array<{
+      rowNumber: number
+      cells: string[]
+    }>
+  }
+  sourcePreview?: {
+    fileName: string
+    fileType: string
+    objectUrl: string
+    previewKind: 'pdf' | 'image' | 'text' | 'other'
+  }
 }
 
 export interface AccountOption {
@@ -276,6 +307,9 @@ export interface SampleSession {
   journalVoucherFinalised: boolean
   journalVoucherFinalisedAt?: string
   finalisedJournalLinesSnapshot: JournalLine[]
+  wp2BankClosingBalance: number | null
+  wp2BookBalanceBeforeBankOnly: number | null
+  wp2VerifiedAt?: string
   sourceIntakeItems: SourceIntakeItem[]
   documents: SourceDocument[]
   splitDecisions: SplitDecision[]

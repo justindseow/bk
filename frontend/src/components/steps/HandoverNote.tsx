@@ -242,7 +242,9 @@ export function HandoverNote({ session, onSessionChange }: HandoverNoteProps) {
           <>
             <div className="metric">
               <span>Adjusted Book</span>
-              <strong>{formatMoney(reconciliation.adjustedBook)}</strong>
+              <strong>
+                {reconciliation.adjustedBook === null ? 'Not set' : formatMoney(reconciliation.adjustedBook)}
+              </strong>
             </div>
             <div className="metric">
               <span>Validation</span>
@@ -257,7 +259,7 @@ export function HandoverNote({ session, onSessionChange }: HandoverNoteProps) {
         }
       >
         <OpeningBalanceReference
-          adjustedBookBalance={reconciliation.adjustedBook}
+          adjustedBookBalance={reconciliation.adjustedBook ?? undefined}
           session={session}
           validationReady={validation.ready}
         />
@@ -312,7 +314,7 @@ function OpeningBalanceReference({
   session,
   validationReady,
 }: {
-  adjustedBookBalance: number
+  adjustedBookBalance?: number
   session: SampleSession
   validationReady: boolean
 }) {
@@ -324,11 +326,13 @@ function OpeningBalanceReference({
       </div>
       <div>
         <span>Closing Bank Balance</span>
-        <strong>{formatMoney(48320)}</strong>
+        <strong>
+          {session.wp2BankClosingBalance === null ? 'Not set' : formatMoney(session.wp2BankClosingBalance)}
+        </strong>
       </div>
       <div>
         <span>Adjusted Book Balance</span>
-        <strong>{formatMoney(adjustedBookBalance)}</strong>
+        <strong>{adjustedBookBalance === undefined ? 'Not set' : formatMoney(adjustedBookBalance)}</strong>
       </div>
       <div>
         <span>Journal Voucher</span>

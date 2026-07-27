@@ -96,7 +96,7 @@ const guidedSteps: GuidedStep[] = [
 ]
 
 export function DemoControls({ activeStep, onSessionChange, onStepChange }: DemoControlsProps) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const [guidedActive, setGuidedActive] = useState(false)
   const [guidedIndex, setGuidedIndex] = useState(0)
   const currentStep = guidedSteps[guidedIndex]
@@ -134,7 +134,7 @@ export function DemoControls({ activeStep, onSessionChange, onStepChange }: Demo
   const clearCurrentSession = () => {
     if (!window.confirm('Clear the current session data? Demo presets will still be available.')) return
     onSessionChange((current) => createBlankBkTestSession(current))
-    onStepChange('wp1')
+    onStepChange('collection')
     setExpanded(true)
     setGuidedActive(false)
     setGuidedIndex(0)
@@ -179,8 +179,8 @@ export function DemoControls({ activeStep, onSessionChange, onStepChange }: Demo
               </button>
               <button className="qa-choice-card" onClick={clearCurrentSession} type="button">
                 <span>BK Test Session</span>
-                <strong>Use Your Own Test Data</strong>
-                <small>Clear the screen, then add or paste sanitised WP1 and WP2 rows.</small>
+                <strong>Start Blank BK Test Session</strong>
+                <small>Remove the demo data, then add or paste your own sanitised WP1 and WP2 rows.</small>
               </button>
               <button className="qa-choice-card" onClick={() => applyPreset(makeFullSessionReadyForJv, 'review')} type="button">
                 <span>Shortcut</span>
@@ -198,7 +198,7 @@ export function DemoControls({ activeStep, onSessionChange, onStepChange }: Demo
             </div>
             <div className="bk-test-actions">
               <button className="secondary-button" onClick={clearCurrentSession} type="button">
-                Clear Current Session Data
+                Start Blank BK Test Session
               </button>
               <button
                 className="secondary-button"
@@ -229,7 +229,7 @@ export function DemoControls({ activeStep, onSessionChange, onStepChange }: Demo
 
           <div className="demo-button-grid">
             <button className="text-button" onClick={resetClean} type="button">
-              Reset to Clean Demo Session
+              Restore Starter Demo Session
             </button>
             <button className="text-button" onClick={resetIssues} type="button">
               Reset to Session With Issues

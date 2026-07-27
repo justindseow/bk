@@ -1,0 +1,55 @@
+{
+  "client": "XYZ Co Sdn Bhd",
+  "lane": "auto",
+  "cases": [
+    {
+      "path": "test docs/AYT SUPPLY_00432345.pdf",
+      "expected": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "date": "16 Feb",
+        "amount": 564.61,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/EURO DELI_INV-52521.pdf",
+      "expected": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "date": "03 Feb",
+        "amount": 934.5,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/LIANG KEE_IV-10846.pdf",
+      "expected": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "date": "02 Feb",
+        "amount": 292.0,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/FRESH SELECT_SALE2026-02-23655.pdf",
+      "expected": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "date": "14 Feb",
+        "amount": 417.78,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/ANTHONY_871116.pdf",
+      "expected": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "amount": 0.0,
+        "status": "Needs Review"
+      }
+    }
+  ]
+}
