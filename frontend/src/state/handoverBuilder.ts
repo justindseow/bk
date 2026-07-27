@@ -1,8 +1,6 @@
 import { calculateWp2Reconciliation, buildValidationResults } from './validation'
 import type { HandoverItem, SampleSession, SplitDecision } from '../types/session'
 
-const BANK_CLOSING_BALANCE = 48320
-
 export const nextPeriodLabel = (period: string) => {
   const [month, year] = period.split(' ')
   const date = new Date(`${month} 1, ${year}`)
@@ -91,14 +89,14 @@ export function buildGeneratedHandoverItems(session: SampleSession): HandoverIte
   })
 
   const unresolvedBankNotes = session.bankRows
-    .filter((row) => row.status === 'Needs Review' || row.status === 'Match Multiple' || row.status === 'New')
+    .filter((row) => row.status === 'Needs Review' || row.status === 'Match Multiple' || row.status === 'New' || row.status === 'Proposed Match')
     .filter((row) => !session.bankOnlyEntries.some((entry) => entry.bankRowId === row.id))
     .filter((row) => !session.timingItems.some((timing) => timing.bankRowId === row.id))
     .map((row) =>
       item({
         id: `handover-bank-watch-${row.id}`,
         category: 'Items to Watch in Next Bank Statement',
-        priority: row.status === 'Needs Review' ? 'High' : 'Medium',
+        priority: row.status === 'Needs Review' || row.status === 'Proposed Match' ? 'High' : 'Medium',
         description: `${row.description} remains to be cleared or explained.`,
         sourceStep: 'WP2',
         amount: row.amount,
@@ -187,7 +185,7 @@ export function buildGeneratedHandoverItems(session: SampleSession): HandoverIte
       priority: 'Medium',
       description: `Closing bank balance for ${session.client.period}.`,
       sourceStep: 'WP2',
-      amount: BANK_CLOSING_BALANCE,
+      amount: session.wp2BankClosingBalance ?? undefined,
       dueTiming: 'Opening reference for next session',
       status: 'Open',
       generated: true,
@@ -196,11 +194,14 @@ export function buildGeneratedHandoverItems(session: SampleSession): HandoverIte
       id: 'handover-opening-book',
       category: 'Opening Balance Reference',
       priority: 'Medium',
-      description: `Adjusted book balance after bank verification: RM ${reconciliation.adjustedBook.toLocaleString('en-MY', {
-        minimumFractionDigits: 2,
-      })}.`,
+      description:
+        reconciliation.adjustedBook === null
+          ? 'Adjusted book balance after bank verification is not confirmed yet.'
+          : `Adjusted book balance after bank verification: RM ${reconciliation.adjustedBook.toLocaleString('en-MY', {
+              minimumFractionDigits: 2,
+            })}.`,
       sourceStep: 'WP2',
-      amount: reconciliation.adjustedBook,
+      amount: reconciliation.adjustedBook ?? undefined,
       dueTiming: 'Opening reference for next session',
       status: 'Open',
       generated: true,

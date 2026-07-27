@@ -37,9 +37,6 @@ export interface ValidationResult {
   ready: boolean
 }
 
-const BANK_CLOSING_BALANCE = 48320
-const BOOK_BALANCE_BEFORE_BANK_ONLY = 42595
-
 const moneyDiff = (left: number, right: number) => Number((left - right).toFixed(2))
 
 const splitTotal = (session: SampleSession, documentId: string) =>
@@ -71,6 +68,9 @@ export function validateDebitCredit(journalLines: JournalLine[]) {
 }
 
 export function calculateWp2Reconciliation(session: SampleSession) {
+  const bankClosingBalance = typeof session.wp2BankClosingBalance === 'number' ? session.wp2BankClosingBalance : null
+  const bookBalanceBeforeBankOnly =
+    typeof session.wp2BookBalanceBeforeBankOnly === 'number' ? session.wp2BookBalanceBeforeBankOnly : null
   const outstandingCheques = session.timingItems
     .filter((item) => item.timingType === 'Outstanding cheque')
     .reduce((sum, item) => sum + item.amount, 0)
@@ -81,15 +81,20 @@ export function calculateWp2Reconciliation(session: SampleSession) {
     const row = session.bankRows.find((bankRow) => bankRow.id === entry.bankRowId)
     return row ? sum + row.amount : sum
   }, 0)
-  const adjustedBank = BANK_CLOSING_BALANCE - outstandingCheques + depositsInTransit
-  const adjustedBook = BOOK_BALANCE_BEFORE_BANK_ONLY + bankOnlyAdjustment
+  const adjustedBank =
+    bankClosingBalance === null ? null : bankClosingBalance - outstandingCheques + depositsInTransit
+  const adjustedBook =
+    bookBalanceBeforeBankOnly === null ? null : bookBalanceBeforeBankOnly + bankOnlyAdjustment
   return {
+    bankClosingBalance,
+    bookBalanceBeforeBankOnly,
     outstandingCheques,
     depositsInTransit,
     bankOnlyAdjustment,
     adjustedBank,
     adjustedBook,
-    difference: moneyDiff(adjustedBank, adjustedBook),
+    difference:
+      adjustedBank === null || adjustedBook === null ? null : moneyDiff(adjustedBank, adjustedBook),
   }
 }
 
@@ -235,6 +240,22 @@ export function buildValidationResults(session: SampleSession): ValidationResult
       )
     }
 
+    if (row.status === 'Proposed Match') {
+      addIssue(
+        issues,
+        checks,
+        {
+          id: `wp2-proposed-${row.id}`,
+          severity: 'Critical',
+          area: 'WP2',
+          issue: `${row.description} has a proposed match that needs confirmation.`,
+          suggestedAction: 'Open WP2 and confirm or reject the proposed match.',
+          step: 'wp2',
+        },
+        'WP2 proposed matches confirmed',
+      )
+    }
+
     if (row.status === 'New' && !session.bankOnlyEntries.some((entry) => entry.bankRowId === row.id)) {
       addIssue(
         issues,
@@ -322,7 +343,45 @@ export function buildValidationResults(session: SampleSession): ValidationResult
   })
 
   const reconciliation = calculateWp2Reconciliation(session)
-  if (Math.abs(reconciliation.difference) > 0.01) {
+  if (session.bankRows.length > 0 && reconciliation.bankClosingBalance === null) {
+    addIssue(
+      issues,
+      checks,
+      {
+        id: 'wp2-bank-closing-missing',
+        severity: 'Critical',
+        area: 'WP2',
+        issue: 'WP2 is missing the bank statement closing balance.',
+        suggestedAction: 'Open WP2 and confirm the closing balance from the statement.',
+        step: 'wp2',
+      },
+      'WP2 bank closing balance confirmed',
+    )
+  }
+
+  if (session.bankRows.length > 0 && reconciliation.bookBalanceBeforeBankOnly === null) {
+    addIssue(
+      issues,
+      checks,
+      {
+        id: 'wp2-book-balance-missing',
+        severity: 'Critical',
+        area: 'WP2',
+        issue: 'WP2 is missing the book balance before bank-only entries.',
+        suggestedAction: 'Open WP2 and confirm the book balance before WP2-only adjustments.',
+        step: 'wp2',
+      },
+      'WP2 book balance confirmed',
+    )
+  }
+
+  if (
+    session.bankRows.length > 0 &&
+    reconciliation.bankClosingBalance !== null &&
+    reconciliation.bookBalanceBeforeBankOnly !== null &&
+    reconciliation.difference !== null &&
+    Math.abs(reconciliation.difference) > 0.01
+  ) {
     addIssue(
       issues,
       checks,
@@ -336,7 +395,31 @@ export function buildValidationResults(session: SampleSession): ValidationResult
       },
       'WP2 reconciliation balanced',
     )
-  } else if (!issues.some((issue) => issue.area === 'WP2' && issue.severity === 'Critical')) {
+  } else if (
+    session.bankRows.length > 0 &&
+    reconciliation.bankClosingBalance !== null &&
+    reconciliation.bookBalanceBeforeBankOnly !== null &&
+    !session.wp2VerifiedAt
+  ) {
+    addIssue(
+      issues,
+      checks,
+      {
+        id: 'wp2-verification-missing',
+        severity: 'Critical',
+        area: 'WP2',
+        issue: 'WP2 has not been explicitly verified yet.',
+        suggestedAction: 'Open WP2 and use Verify WP2 after the balances and bank rows are complete.',
+        step: 'wp2',
+      },
+      'WP2 sign-off completed',
+    )
+  } else if (
+    session.bankRows.length > 0 &&
+    reconciliation.bankClosingBalance !== null &&
+    reconciliation.bookBalanceBeforeBankOnly !== null &&
+    !issues.some((issue) => issue.area === 'WP2' && issue.severity === 'Critical')
+  ) {
     checks.push({
       id: 'check-wp2-clear',
       area: 'WP2',

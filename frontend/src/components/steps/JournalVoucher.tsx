@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { buildValidationResults } from '../../state/validation'
 import type { JournalLine, SampleSession, WorkflowStepId } from '../../types/session'
@@ -67,8 +67,8 @@ const snapshotMatchesCurrent = (snapshot: JournalLine[], current: JournalLine[])
   JSON.stringify(snapshot) === JSON.stringify(current)
 
 export function JournalVoucher({ session, onSessionChange, onStepChange }: JournalVoucherProps) {
-  const [runCount, setRunCount] = useState(1)
-  const validation = useMemo(() => buildValidationResults(session), [session, runCount])
+  const [lastValidatedAt, setLastValidatedAt] = useState('Using the current session state.')
+  const validation = buildValidationResults(session)
   const journalLines = validation.journalLines
   const hasLines = journalLines.length > 0
   const isBalanced = Math.abs(validation.difference) < 0.01
@@ -119,7 +119,17 @@ export function JournalVoucher({ session, onSessionChange, onStepChange }: Journ
           ) : null}
         </div>
         <div className="review-actions">
-          <button className="secondary-button" onClick={() => setRunCount((count) => count + 1)} type="button">
+          <button
+            className="secondary-button"
+            onClick={() =>
+              setLastValidatedAt(`Last checked at ${new Date().toLocaleTimeString('en-MY', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              })}.`)
+            }
+            type="button"
+          >
             Re-run Validation
           </button>
           <button className="secondary-button" onClick={() => onStepChange('review')} type="button">
@@ -128,6 +138,7 @@ export function JournalVoucher({ session, onSessionChange, onStepChange }: Journ
           <button className="primary-button" disabled={!canFinalise} onClick={finalise} type="button">
             Finalise Journal Voucher
           </button>
+          <small>{lastValidatedAt}</small>
         </div>
       </section>
 
@@ -294,7 +305,16 @@ function JournalVoucherTable({
   groupedLines: Array<{ source: SourceType; lines: JournalLine[] }>
   session: SampleSession
 }) {
-  let rowNumber = 0
+  const numberedGroups = groupedLines.map((group, groupIndex) => ({
+    ...group,
+    lines: group.lines.map((line, lineIndex) => ({
+      line,
+      rowNumber:
+        groupedLines.slice(0, groupIndex).reduce((sum, previousGroup) => sum + previousGroup.lines.length, 0) +
+        lineIndex +
+        1,
+    })),
+  }))
 
   return (
     <div className="table-scroll">
@@ -314,16 +334,15 @@ function JournalVoucherTable({
           </tr>
         </thead>
         <tbody>
-          {groupedLines.flatMap((group) => {
-            const debitSubtotal = group.lines.reduce((sum, line) => sum + line.debit, 0)
-            const creditSubtotal = group.lines.reduce((sum, line) => sum + line.credit, 0)
+          {numberedGroups.flatMap((group) => {
+            const debitSubtotal = group.lines.reduce((sum, entry) => sum + entry.line.debit, 0)
+            const creditSubtotal = group.lines.reduce((sum, entry) => sum + entry.line.credit, 0)
 
             return [
               <tr className="section-row" key={`${group.source}-section`}>
                 <td colSpan={10}>{sourceLabels[group.source]}</td>
               </tr>,
-              ...group.lines.map((line) => {
-                rowNumber += 1
+              ...group.lines.map(({ line, rowNumber }) => {
                 return (
                   <tr key={line.id}>
                     <td className="mono">{String(rowNumber).padStart(3, '0')}</td>

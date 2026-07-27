@@ -45,12 +45,14 @@ export const findAccount = (code: string) => accountOptions.find((account) => ac
 export const accountsForDocumentType = (docType: DocumentType) => {
   const preferredCodes: Record<DocumentType, string[]> = {
     'Sales Invoice': ['4100', '4120'],
+    'Sales Summary': ['4100', '4120'],
     'Purchase Invoice': ['5020', '6200', '6210', '6380'],
     'Payment Voucher': ['5020', '6200', '6210', '6380', '1530', '2700'],
     Receipt: ['4100', '4120', '2800', '3100'],
     'Payroll Summary': ['6100', '6110', '6120', '6130', '2400', '2410', '2420', '2430'],
     'Loan / HP Statement': ['2700', '6600'],
     'Merchant Statement': ['4120', '6370'],
+    'Merchant Discount Fee': ['6370', '6380'],
     'Utility Bill': ['6210', '2110'],
   }
 

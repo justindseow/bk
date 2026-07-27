@@ -1,0 +1,39 @@
+{
+  "client": "THE SUBURBAN FOOD SDN BHD",
+  "lane": "purchases",
+  "cases": [
+    {
+      "path": "test docs/PTS Food Distribution Sdn Bhd 20260203 PG26020256.pdf",
+      "expected": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "date": "03 Feb",
+        "reference": "PG26020256",
+        "amount": 1674.6,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/PTS Food Distribution Sdn Bhd 20260203 PL26020079.pdf",
+      "expected": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "date": "03 Feb",
+        "reference": "PL26020079",
+        "amount": 722.0,
+        "status": "Accepted"
+      }
+    },
+    {
+      "path": "test docs/PTS Food Distribution Sdn Bhd 20260204 PF26020519.pdf",
+      "expected": {
+        "detectedType": "Purchase Invoice",
+        "target": "WP1",
+        "date": "04 Feb",
+        "reference": "PF26020519",
+        "amount": 399.0,
+        "status": "Accepted"
+      }
+    }
+  ]
+}

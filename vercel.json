@@ -4,27 +4,30 @@
   "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/dist",
   "functions": {
-    "api/index.py": {
-      "maxDuration": 60,
-      "excludeFiles": "{reference/**,frontend/node_modules/**,frontend/dist/**,backend/.venv/**,**/__pycache__/**,**/*.pyc}"
+    "api/*.py": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
     {
       "source": "/health",
-      "destination": "/api/index.py"
+      "destination": "/api/app.py"
     },
     {
       "source": "/export/(.*)",
-      "destination": "/api/index.py"
+      "destination": "/api/app.py"
     },
     {
       "source": "/intake/(.*)",
-      "destination": "/api/index.py"
+      "destination": "/api/app.py"
+    },
+    {
+      "source": "/intake-json/(.*)",
+      "destination": "/api/app.py"
     },
     {
       "source": "/feedback",
-      "destination": "/api/index.py"
+      "destination": "/api/app.py"
     },
     {
       "source": "/(.*)",
